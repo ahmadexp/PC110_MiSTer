@@ -50,6 +50,9 @@ module pc110_chipset
 	logic [7:0] pcic [0:127];
 	logic [7:0] ecb [0:31];
 	logic [7:0] pos [0:7];
+	logic [7:0] xr [0:127];
+	logic [6:0] xr_index;
+	logic       vstat_flip;
 
 	logic [6:0] scamp_index;
 	logic [7:0] block2_index;
@@ -191,6 +194,29 @@ module pc110_chipset
 		eced[8'h29] = 8'hFF; eced[8'h2A] = 8'hFF;
 		eced[8'h2B] = 8'hFF; eced[8'h37] = 8'h10;
 
+		// C&T F65535 extension registers (XR), index/data at 3D6h/3D7h.
+		// Live text-mode capture from the running PC110; XR00 = C1h is the
+		// chip identity (chipcode Ch = F65535, revision 1) and XR70 = 00h
+		// keeps the 3C3/46E8 enable path accessible.
+		for(i = 0; i < 128; i = i + 1) xr[i] = 8'h00;
+		xr[8'h00] = 8'hC1; xr[8'h01] = 8'hDE;
+		xr[8'h02] = 8'h01; xr[8'h03] = 8'h02;
+		xr[8'h04] = 8'h81; xr[8'h06] = 8'hC2;
+		xr[8'h08] = 8'hF8; xr[8'h0E] = 8'h80;
+		xr[8'h0F] = 8'h01; xr[8'h18] = 8'hFF;
+		xr[8'h19] = 8'h56; xr[8'h1A] = 8'h13;
+		xr[8'h1B] = 8'h5F; xr[8'h1C] = 8'h4F;
+		xr[8'h1D] = 8'h7F; xr[8'h1E] = 8'hFF;
+		xr[8'h1F] = 8'h02; xr[8'h28] = 8'h80;
+		xr[8'h29] = 8'h4C; xr[8'h2B] = 8'h03;
+		xr[8'h2C] = 8'h04; xr[8'h2D] = 8'h50;
+		xr[8'h2E] = 8'h50; xr[8'h30] = 8'h05;
+		xr[8'h31] = 8'h14; xr[8'h32] = 8'h13;
+		xr[8'h33] = 8'h40; xr[8'h51] = 8'hC4;
+		xr[8'h52] = 8'h42; xr[8'h54] = 8'hC0;
+		xr[8'h55] = 8'hE5; xr[8'h57] = 8'h23;
+		xr[8'h60] = 8'h88; xr[8'h61] = 8'h2E;
+
 		// Ricoh RB5C396 / 82365-compatible controller.  Both sockets start
 		// empty; software can program the remaining ExCA register file.
 		pcic[8'h00] = 8'h83; pcic[8'h01] = 8'h33;
@@ -241,6 +267,14 @@ module pc110_chipset
 			16'h0100, 16'h0101, 16'h0102, 16'h0103,
 			16'h0104, 16'h0105, 16'h0106, 16'h0107:
 				io_readdata = (planar_setup == 8'hDF) ? pos[io_address[2:0]] : 8'hFF;
+			16'h03D6: io_readdata = {1'b0, xr_index};
+			16'h03D7: io_readdata = xr[xr_index];
+			// Input Status 1 shim: vertical-retrace bit 3 toggles on every
+			// read and display-enable bit 0 stays set, exactly the behavior
+			// the PC110-EMU oracle uses to satisfy the video BIOS retrace
+			// waits.  vga.v still sees the read for its flip-flop side
+			// effects; this only overrides the returned data.
+			16'h03DA, 16'h03BA: io_readdata = {4'h0, vstat_flip, 2'b00, 1'b1};
 			16'h03E0: io_readdata = 8'hFF;
 			16'h03E1: io_readdata = pcic[pcic_index];
 			16'h1160: io_readdata = {1'b0, font_bank[6:0]};
@@ -330,6 +364,8 @@ module pc110_chipset
 					16'h0100, 16'h0101, 16'h0102, 16'h0103,
 					16'h0104, 16'h0105, 16'h0106, 16'h0107:
 						if(planar_setup == 8'hDF) pos[io_address[2:0]] <= io_writedata;
+					16'h03D6: xr_index <= io_writedata[6:0];
+					16'h03D7: if(xr_index != 7'h00) xr[xr_index] <= io_writedata;
 					16'h03E0: pcic_index <= io_writedata[6:0];
 					16'h03E1: if((pcic_index[5:0] != 6'h00))
 						pcic[pcic_index] <= io_writedata;
@@ -349,6 +385,16 @@ module pc110_chipset
 	// POST diagnostic logger.  Snoops writes to 3BCh/190h/191h (these
 	// remain outside io_cs so other decode is unaffected) into a small
 	// FIFO of {tag, code} pairs drained by a 115200-baud UART transmitter.
+
+	// Input Status 1 toggle: one flip per completed read of 3DAh/3BAh.
+	logic io_read_d;
+	always_ff @(posedge clk) begin
+		io_read_d <= io_read;
+		if(reset) vstat_flip <= 1'b0;
+		else if(io_read && !io_read_d &&
+		        (io_address == 16'h03DA || io_address == 16'h03BA))
+			vstat_flip <= ~vstat_flip;
+	end
 
 	logic [15:0] plog_fifo [0:15];
 	logic  [3:0] plog_head, plog_tail;

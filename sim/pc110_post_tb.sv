@@ -99,9 +99,13 @@ ao486 ao486
 reg [7:0] mem [0:1048575];
 
 integer mi;
+reg [1023:0] bios_hex;
 initial begin
 	for(mi = 0; mi < 1048576; mi = mi + 1) mem[mi] = 8'h00;
-	$readmemh("artifacts/test/pc110_bios.hex", mem, 20'hC0000, 20'hFFFFF);
+	if($value$plusargs("bios=%s", bios_hex))
+		$readmemh(bios_hex, mem, 20'hC0000, 20'hFFFFF);
+	else
+		$readmemh("artifacts/test/pc110_bios.hex", mem, 20'hC0000, 20'hFFFFF);
 end
 
 wire [24:0] DDRAM_ADDR;
