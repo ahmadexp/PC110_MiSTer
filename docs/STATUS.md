@@ -50,18 +50,50 @@ Two important corrections follow from that rule:
 7. The ao486 30 MHz profile is the closest currently available setting; a
    separately verified 33.333 MHz CPU/timer profile remains future work.
 
+## Core identity and Main support
+
+The core identifies itself as `PC110`.  MiSTer Main gates its x86 support
+(IDE image mounting, CMOS injection, boot-ROM loading) on the core name, so
+a patched Main is required; the one-line `is_x86()` change plus a gcc-6
+compatibility fix live in `scripts/mister-main-pc110.patch` (apply to the
+`upstream-main` tree and build with the misterkun/toolchain container using
+`make BASE=arm-linux-gnueabihf CC='arm-linux-gnueabihf-gcc -mcpu=cortex-a9
+-mfpu=neon -mfloat-abi=hard'`).
+
+The December 2024 upstream ao486 prefetch-reset fix (`be9b103`) is
+cherry-picked into `rtl/ao486/memory/prefetch.v`.
+
 ## Verification
 
 `scripts/test.sh` checks the board-specific register decode, unlock sequences,
 writable PCIC state, font controls, and upper-memory shadow decode with
-Icarus Verilog.  Quartus compilation is the integration check for the inherited
-ao486 tree.  Hardware smoke tests should record:
+Icarus Verilog.
+
+`scripts/sim-post.sh` executes the real 256 KiB flash image from the reset
+vector on the full memory path (ao486 CPU, iobus, pc110_chipset, the modified
+l2_cache, and a latency/backpressure DDR model) and traces all I/O, memory
+writes, flag changes, and executed EIPs.  Findings from that harness:
+
+- the BIOS reset code performs a severe CPU register/segment/flags self-test
+  at `F000:44CA-4648`; any failure silently halts at `F000:461A` (or writes
+  POST code `DDh` to ports `190h/191h` and halts at `F000:44D9`)
+- the BIOS reports POST progress bytes on port `3BCh` (`C1h`, `05h`,
+  `C2h`, ...) and failure codes on `190h/191h`
+- in simulation the CPU passes the self-test, the chipset answers the full
+  VL82C420 unlock/config sequence, and POST reaches the memory-sizing
+  phase (BDA writes at `410h` onward) under every configuration tested:
+  L1 on/off, with/without the prefetch fix, ideal and slow DDR
+
+On hardware the CPU halts before the first BDA write, with junk byte-writes
+visible in low DDR - behavior simulation does not reproduce.  The next
+diagnostic is a POST-code logger: latch chipset writes to `3BCh`, `190h`,
+and `191h` and stream them out the core's UART (`/dev/ttyS1` on the HPS) so
+the on-hardware failure point becomes directly observable.
+
+Hardware smoke tests should record:
 
 - RBF path and SHA-256
 - MiSTer Main version
 - `/tmp/CORENAME`
 - installed ROM sizes and hashes
 - on-screen POST code or failure point
-
-The next useful diagnostic is a small FPGA POST logger for writes to the
-known BIOS diagnostic ports, exposed to the HPS without changing CPU timing.

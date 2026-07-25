@@ -88,15 +88,24 @@ The script:
 4. installs the split ROMs in `/media/fat/games/AO486`; and
 5. creates remembered FC6/FC7 paths for the complete font and BIOS images.
 
-The internal configuration identifier intentionally remains `AO486`.  MiSTer
-Main versions from 2022 recognize that exact name when setting up x86 boot
-media and CMOS.  The external RBF filename remains `PC110_*.rbf`.
+The core identifies itself as `PC110` everywhere: the OSD title, the config
+directory, `/tmp/CORENAME`, and the ROM search path (`games/PC110`).
 
-The complete flash load is not redundant.  That old Main loads only 64 KiB
-through its normal `boot1.rom` path, while early PC110 POST needs all 256 KiB
-at `C0000h-FFFFFh`.  FC7 writes the full image directly to DDR at
-`300C0000h`; the split images remain compatible with newer Main versions and
-overlay the same bytes.
+MiSTer Main activates its x86 support (IDE image mounting, CMOS) by core
+name, and stock Main only recognizes `AO486`.  This repository therefore
+carries a one-line patch in `upstream-main/user_io.cpp` that adds `PC110` to
+Main's `is_x86()` check.  Build the patched Main with the official toolchain
+container and install it alongside the core:
+
+```sh
+docker run --rm -v "$PWD/upstream-main:/mister" -w /mister \
+  misterkun/toolchain make
+```
+
+The complete flash load is not redundant.  Main's normal `boot1.rom` path
+historically loads only part of the image, while early PC110 POST needs all
+256 KiB at `C0000h-FFFFFh`.  FC7 writes the full image directly to DDR at
+`300C0000h`; the split images overlay the same bytes.
 
 To restore the AO486 files later, pass the backup path printed by deployment:
 
