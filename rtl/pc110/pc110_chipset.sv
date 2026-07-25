@@ -32,8 +32,17 @@ module pc110_chipset
 	// candidate row-configuration codes here and expects the array's
 	// aliasing behavior to follow; 0Bh is the settled planar value
 	// captured from live hardware.
-	output logic  [7:0] dram_cfg0
+	output logic  [7:0] dram_cfg0,
+
+	// POST diagnostic logger: every write to the BIOS progress port
+	// (3BCh) and failure-code ports (190h/191h) is streamed out this
+	// UART line at 115200 baud as a tag byte ('P', 'E', 'e') followed
+	// by the code byte.  Idle high.
+	output logic        postlog_tx
 );
+
+	// clk_sys is 90 MHz; 90e6 / 115200 = 781.25
+	localparam int unsigned POSTLOG_DIV = 782;
 
 	logic [7:0] scamp [0:127];
 	logic [7:0] block2[0:255];
@@ -333,6 +342,71 @@ module pc110_chipset
 					default: ;
 				endcase
 			end
+		end
+	end
+
+	// ------------------------------------------------------------------
+	// POST diagnostic logger.  Snoops writes to 3BCh/190h/191h (these
+	// remain outside io_cs so other decode is unaffected) into a small
+	// FIFO of {tag, code} pairs drained by a 115200-baud UART transmitter.
+
+	logic [15:0] plog_fifo [0:15];
+	logic  [3:0] plog_head, plog_tail;
+	logic        io_write_d;
+
+	always_ff @(posedge clk) begin
+		io_write_d <= io_write;
+		if(reset) begin
+			plog_tail <= 4'd0;
+		end
+		else if(io_write && !io_write_d) begin
+			case(io_address)
+				16'h03BC: begin plog_fifo[plog_tail] <= {8'h50, io_writedata}; plog_tail <= plog_tail + 4'd1; end // 'P'
+				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 4'd1; end // 'E'
+				16'h0191: begin plog_fifo[plog_tail] <= {8'h65, io_writedata}; plog_tail <= plog_tail + 4'd1; end // 'e'
+				default: ;
+			endcase
+		end
+	end
+
+	logic [9:0]  plog_div;
+	logic [3:0]  plog_bit;
+	logic [9:0]  plog_shift;
+	logic        plog_second;   // sending the code byte of the pair
+	logic [7:0]  plog_code;
+
+	always_ff @(posedge clk) begin
+		if(reset) begin
+			plog_head   <= 4'd0;
+			plog_bit    <= 4'd0;
+			plog_div    <= 10'd0;
+			plog_second <= 1'b0;
+			postlog_tx  <= 1'b1;
+		end
+		else if(plog_bit == 4'd0) begin
+			postlog_tx <= 1'b1;
+			if(plog_head != plog_tail || plog_second) begin
+				if(plog_second) begin
+					plog_shift <= {1'b1, plog_code, 1'b0};
+				end
+				else begin
+					plog_shift <= {1'b1, plog_fifo[plog_head][15:8], 1'b0};
+					plog_code  <= plog_fifo[plog_head][7:0];
+					plog_head  <= plog_head + 4'd1;
+				end
+				plog_second <= ~plog_second;
+				plog_bit    <= 4'd10;
+				plog_div    <= 10'd0;
+			end
+		end
+		else begin
+			postlog_tx <= plog_shift[0];
+			if(plog_div == POSTLOG_DIV[9:0] - 10'd1) begin
+				plog_div   <= 10'd0;
+				plog_shift <= {1'b1, plog_shift[9:1]};
+				plog_bit   <= plog_bit - 4'd1;
+			end
+			else plog_div <= plog_div + 10'd1;
 		end
 	end
 

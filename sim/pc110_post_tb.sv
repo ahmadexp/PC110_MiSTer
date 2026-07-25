@@ -177,6 +177,7 @@ wire  [6:0] pc110_font_bank_w;
 wire  [7:0] pc110_font_seg_w;
 wire        pc110_font_en_w;
 wire  [7:0] pc110_dram_cfg0_w;
+wire        postlog_tx_w;
 
 l2_cache cache
 (
@@ -278,8 +279,11 @@ pc110_chipset pc110
 	.font_bank_select    (pc110_font_bank_w),
 	.font_window_segment (pc110_font_seg_w),
 	.font_window_enable  (pc110_font_en_w),
-	.dram_cfg0           (pc110_dram_cfg0_w)
+	.dram_cfg0           (pc110_dram_cfg0_w),
+	.postlog_tx          (postlog_tx_w)
 );
+
+
 
 // real AT peripherals: PIT (40h-43h, 61h), 8042 KBC (60h-67h, 90h-9Fh),
 // and the PC110-modified RTC (70h/71h) with Main's CMOS image injected
@@ -408,6 +412,36 @@ assign iobus_readdata = {4{io_read8}};
 // ---------------------------------------------------------------- tracing
 
 integer cycles = 0;
+
+// decode the POST-logger UART stream (100 MHz / 115200 = 868... the
+// chipset divider is built for 90 MHz; at the TB clock the bit time is
+// POSTLOG_DIV cycles regardless, so sample mid-bit by counting cycles)
+reg  [3:0] plmon_bit = 0;
+reg [11:0] plmon_div = 0;
+reg  [7:0] plmon_sh = 0;
+reg  [7:0] plmon_tag = 0;
+reg        plmon_have_tag = 0;
+always @(posedge clk) begin
+	if(plmon_bit == 0) begin
+		if(!postlog_tx_w) begin
+			plmon_bit <= 9;
+			plmon_div <= 12'd782 + 12'd391;
+		end
+	end
+	else if(plmon_div != 0) plmon_div <= plmon_div - 1'b1;
+	else begin
+		if(plmon_bit != 1) plmon_sh <= {postlog_tx_w, plmon_sh[7:1]};
+		else begin
+			if(!plmon_have_tag) begin plmon_tag <= plmon_sh; plmon_have_tag <= 1; end
+			else begin
+				$display("PLOG %c %02x  (t=%0d)", plmon_tag, plmon_sh, cycles);
+				plmon_have_tag <= 0;
+			end
+		end
+		plmon_bit <= plmon_bit - 1'b1;
+		plmon_div <= 12'd782;
+	end
+end
 integer io_count = 0;
 integer ram_write_count = 0;
 

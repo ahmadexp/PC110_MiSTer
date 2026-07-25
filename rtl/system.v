@@ -43,6 +43,7 @@ module system
 	input         clk_uart1,
 	input         uart1_rx,
 	output        uart1_tx,
+	output        pc110_postlog_tx,
 	input         uart1_cts_n,
 	input         uart1_dcd_n,
 	input         uart1_dsr_n,
@@ -390,7 +391,8 @@ pc110_chipset pc110
 	.font_bank_select    (pc110_font_bank),
 	.font_window_segment (pc110_font_segment),
 	.font_window_enable  (pc110_font_enable),
-	.dram_cfg0           (pc110_dram_cfg0)
+	.dram_cfg0           (pc110_dram_cfg0),
+	.postlog_tx          (pc110_postlog_tx)
 );
 
 iobus iobus

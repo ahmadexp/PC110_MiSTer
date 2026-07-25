@@ -510,6 +510,7 @@ always @(posedge clk_sys) cur_rate <= clk_rate[clk_req];
 
 wire uart1_cts, uart1_dcd, uart1_dsr, uart1_rts, uart1_dtr;
 wire uart1_tx, uart1_rx;
+wire pc110_postlog_tx;
 wire mpu_tx, mpu_rx;
 
 wire hps_mpu = (uart1_mode >= 3);
@@ -521,7 +522,9 @@ assign uart1_dcd = ~hps_mpu & UART_DSR;
 assign uart1_dsr = ~hps_mpu & UART_DSR;
 assign uart1_rx  = ~hps_mpu & UART_RXD;
 assign mpu_rx    = ~hps_mpu ? midi_rx : UART_RXD;
-assign UART_TXD  = ~hps_mpu ? uart1_tx : (mpu_tx & ~mt32_use);
+// The PC110 POST logger shares the UART TX line (both idle high); POST
+// codes stream out before any COM1 traffic exists.
+assign UART_TXD  = pc110_postlog_tx & (~hps_mpu ? uart1_tx : (mpu_tx & ~mt32_use));
 
 /// UART2
 
@@ -784,6 +787,7 @@ system system
 
 	.uart1_rx             (uart1_rx),
 	.uart1_tx             (uart1_tx),
+	.pc110_postlog_tx     (pc110_postlog_tx),
 	.uart1_cts_n          (uart1_cts),
 	.uart1_dcd_n          (uart1_dcd),
 	.uart1_dsr_n          (uart1_dsr),
