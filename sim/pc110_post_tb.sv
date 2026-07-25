@@ -176,6 +176,7 @@ wire [15:0] pc110_shadow_we_w;
 wire  [6:0] pc110_font_bank_w;
 wire  [7:0] pc110_font_seg_w;
 wire        pc110_font_en_w;
+wire  [7:0] pc110_dram_cfg0_w;
 
 l2_cache cache
 (
@@ -218,7 +219,8 @@ l2_cache cache
 	.PC110_SHADOW_WE   (pc110_shadow_we_w),
 	.PC110_FONT_BANK   (pc110_font_bank_w),
 	.PC110_FONT_SEG    (pc110_font_seg_w),
-	.PC110_FONT_EN     (pc110_font_en_w)
+	.PC110_FONT_EN     (pc110_font_en_w),
+	.PC110_DRAM_CFG0   (pc110_dram_cfg0_w)
 );
 
 // ---------------------------------------------------------------- iobus
@@ -275,7 +277,8 @@ pc110_chipset pc110
 	.shadow_read_enable  (),
 	.font_bank_select    (pc110_font_bank_w),
 	.font_window_segment (pc110_font_seg_w),
-	.font_window_enable  (pc110_font_en_w)
+	.font_window_enable  (pc110_font_en_w),
+	.dram_cfg0           (pc110_dram_cfg0_w)
 );
 
 // real AT peripherals: PIT (40h-43h, 61h), 8042 KBC (60h-67h, 90h-9Fh),
@@ -422,6 +425,11 @@ integer rd_count = 0;
 reg [31:0] eip_tail [0:255];
 integer eip_tail_pos = 0;
 reg [31:0] last_exe_eip = 32'hFFFFFFFF;
+reg [31:0] last_caller_eip = 32'hFFFFFFFF;
+always @(posedge clk)
+	if(ao486.pipeline_inst.exe_ready &&
+	   !(ao486.pipeline_inst.exe_eip >= 32'h0000DB60 && ao486.pipeline_inst.exe_eip < 32'h0000DD00))
+		last_caller_eip <= ao486.pipeline_inst.exe_eip;
 always @(posedge clk) begin
 	if(ao486.pipeline_inst.exe_ready && ao486.pipeline_inst.exe_eip !== last_exe_eip) begin
 		last_exe_eip <= ao486.pipeline_inst.exe_eip;
@@ -444,6 +452,8 @@ reg iobus_read_d = 0;
 always @(posedge clk) begin
 	iobus_read_d <= iobus_read;
 
+	if(iobus_write && (iobus_address == 16'h00EC || iobus_address == 16'h00ED))
+		$display("ECED %s %02x  caller=%08x t=%0d", (iobus_address==16'h00EC)?"idx":"dat", iobus_writedata[7:0], last_caller_eip, cycles);
 	if(iobus_write) begin
 		io_tail_addr[io_tail_pos] <= iobus_address;
 		io_tail_data[io_tail_pos] <= iobus_writedata[7:0];

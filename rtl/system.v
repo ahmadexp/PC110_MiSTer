@@ -203,6 +203,7 @@ wire [15:0] pc110_shadow_read_enable;
 wire  [6:0] pc110_font_bank;
 wire  [7:0] pc110_font_segment;
 wire        pc110_font_enable;
+wire  [7:0] pc110_dram_cfg0;
 
 wire [29:0] mem_address;
 wire [31:0] mem_writedata;
@@ -266,7 +267,8 @@ l2_cache cache
 	.PC110_SHADOW_WE   (pc110_shadow_write_enable),
 	.PC110_FONT_BANK   (pc110_font_bank),
 	.PC110_FONT_SEG    (pc110_font_segment),
-	.PC110_FONT_EN     (pc110_font_enable)
+	.PC110_FONT_EN     (pc110_font_enable),
+	.PC110_DRAM_CFG0   (pc110_dram_cfg0)
 );
 
 ao486 ao486
@@ -387,7 +389,8 @@ pc110_chipset pc110
 	.shadow_read_enable  (pc110_shadow_read_enable),
 	.font_bank_select    (pc110_font_bank),
 	.font_window_segment (pc110_font_segment),
-	.font_window_enable  (pc110_font_enable)
+	.font_window_enable  (pc110_font_enable),
+	.dram_cfg0           (pc110_dram_cfg0)
 );
 
 iobus iobus

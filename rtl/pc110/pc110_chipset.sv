@@ -26,7 +26,13 @@ module pc110_chipset
 
 	output logic  [6:0] font_bank_select,
 	output logic  [7:0] font_window_segment,
-	output logic        font_window_enable
+	output logic        font_window_enable,
+
+	// VL82C420 EC/ED RAMCFG0 (index 02h).  POST's DRAM bank sizer writes
+	// candidate row-configuration codes here and expects the array's
+	// aliasing behavior to follow; 0Bh is the settled planar value
+	// captured from live hardware.
+	output logic  [7:0] dram_cfg0
 );
 
 	logic [7:0] scamp [0:127];
@@ -57,6 +63,7 @@ module pc110_chipset
 	assign font_bank_select = font_bank[6:0];
 	assign font_window_segment = font_segment;
 	assign font_window_enable = font_enable;
+	assign dram_cfg0 = eced[8'h02];
 
 	integer i;
 	initial begin

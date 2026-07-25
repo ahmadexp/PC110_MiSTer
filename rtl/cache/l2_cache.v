@@ -48,7 +48,14 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// exposed as a 7-bit-banked 8 KiB window (normally DE000-DFFFF).
 	input   [6:0] PC110_FONT_BANK,
 	input   [7:0] PC110_FONT_SEG,
-	input         PC110_FONT_EN
+	input         PC110_FONT_EN,
+
+	// VL82C420 RAMCFG0 (EC/ED index 02h).  POST's bank sizer relies on
+	// physical DRAM aliasing: while the programmed row configuration does
+	// not match the planar array (0Bh), accesses inside the 4 MiB planar
+	// bank fold their row bits so a write at +400h reads back at the base
+	// address, and the expansion region does not respond.
+	input   [7:0] PC110_DRAM_CFG0
 );
    
 
@@ -210,7 +217,19 @@ wire [ADDRBITS:0] pc110_font_addr =
 // CPU_ADDR is a 32-bit-word address, hence 20 MiB == 0x00500000.
 // The upper-memory flash/shadow area and the banked font window remain
 // backed by DDR even though they are outside installed conventional RAM.
-wire ram_rgn = (CPU_ADDR < 30'h00500000) ||
+//
+// POST's DRAM bank sizer (F000:3889) programs candidate row codes into
+// RAMCFG0 and detects the geometry from physical aliasing.  While the
+// planar configuration is not the settled 0Bh, conventional-memory
+// accesses below A0000h fold the +400h/+800h/+1000h row bits so the
+// probe observes the 4 MiB planar's alias signature, and the expansion
+// region does not respond (open bus).
+wire pc110_cfg_settled = (PC110_DRAM_CFG0[3:0] == 4'hB);
+wire pc110_fold = ~pc110_cfg_settled && (CPU_ADDR < 30'h00028000);
+wire [29:0] cpu_addr_m = pc110_fold ? (CPU_ADDR & ~30'h00000700) : CPU_ADDR;
+
+wire ram_rgn = (CPU_ADDR < 30'h00100000) ||
+	((CPU_ADDR < 30'h00500000) && pc110_cfg_settled) ||
 	pc110_upper_rgn || pc110_font_rgn;
 
 wire [7:0] be64 = CPU_ADDR[0] ? {CPU_BE, 4'h0} : {4'h0, CPU_BE};
@@ -282,15 +301,15 @@ always @(posedge CLK) begin
 					if (!DDRAM_BUSY) begin
 						
 						// for timing purposes, most registers are assigned without region checks
-						CPU_ADDR_1    <= CPU_ADDR;
+						CPU_ADDR_1    <= cpu_addr_m;
 						CPU_DIN_1     <= CPU_DIN;
 						CPU_WE_1      <= CPU_WE;
 
-						ram_addr      <= CPU_ADDR[ADDRBITS+1:1];
+						ram_addr      <= cpu_addr_m[ADDRBITS+1:1];
 						ram_burstcnt  <= 8'h01;
-						read_addr     <= CPU_ADDR[ADDRBITS+1:1];
+						read_addr     <= cpu_addr_m[ADDRBITS+1:1];
 						burst_left    <= CPU_BURSTCNT;
-						data64_high   <= CPU_ADDR[0];
+						data64_high   <= cpu_addr_m[0];
 
 						vga_wa        <= CPU_ADDR[14:0];
 						vga_bcnt      <= 3;
@@ -304,7 +323,7 @@ always @(posedge CLK) begin
 
 						memory_datain <= {CPU_DIN, CPU_DIN};
 						memory_be     <= be64;
-						memory_addr_b <= CPU_ADDR[RAMSIZEBITS:1];
+						memory_addr_b <= cpu_addr_m[RAMSIZEBITS:1];
 
 						if(pc110_font_rgn) begin
 							ram_addr  <= pc110_font_addr;
@@ -362,7 +381,7 @@ always @(posedge CLK) begin
 			READONE:
 				begin
 					vga_ram         <= read_behind;		// use fake vga response for reading behind available ram
-					vga_data_r      <= 32'd0;
+					vga_data_r      <= read_behind ? 32'hFFFFFFFF : 32'd0;	// open bus beyond installed RAM
 					state           <= FILLCACHE;
 					ram_rd          <= 1'b1;
 					ram_addr        <= {read_addr[ADDRBITS:LINESIZE_BITS], {LINESIZE_BITS{1'b0}}};
