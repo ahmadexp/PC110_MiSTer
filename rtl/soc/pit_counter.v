@@ -64,6 +64,13 @@ end
 
 //------------------------------------------------------------------------------
 
+reg output_latched;
+reg msb_write;
+reg msb_read;
+reg status_latched;
+reg [15:0] counter;
+wire load;
+wire enable;
 reg [7:0] counter_l;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                               counter_l <= 8'd0;
@@ -94,7 +101,6 @@ always @(posedge clk) begin
     else if(~output_latched)                output_m <= counter[15:8];
 end
 
-reg output_latched;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                               output_latched <= 1'b0;
     else if(set_control_mode)                       output_latched <= 1'b0;
@@ -110,14 +116,12 @@ always @(posedge clk) begin
     else if(load)                                    null_counter <= 1'b0;
 end
 
-reg msb_write;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                 msb_write <= 1'b0;
     else if(set_control_mode)         msb_write <= 1'b0;
     else if(write && rw_mode == 2'd3) msb_write <= ~msb_write;
 end
 
-reg msb_read;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                msb_read <= 1'b0;
     else if(set_control_mode)        msb_read <= 1'b0;
@@ -130,7 +134,6 @@ always @(posedge clk) begin
     else if(latch_status && ~status_latched) status <= { out, null_counter, rw_mode, mode, bcd };
 end
 
-reg status_latched;
 always @(posedge clk) begin
     if(rst_n == 1'b0)           status_latched <= 1'b0;
     else if(set_control_mode)   status_latched <= 1'b0;
@@ -233,7 +236,7 @@ always @(posedge clk) begin
     else if(load)             loaded <= 1'b1;
 end
 
-wire load = clock_pulse && (
+assign load = clock_pulse && (
     (mode      == 3'd0 &&   written) ||
     (mode      == 3'd1 &&  (written && control_set) && trigger_sampled) ||
     (mode[1:0] == 2'd2 && ((written && control_set) || trigger_sampled || (loaded && gate_sampled && counter == 16'd1))) ||
@@ -242,7 +245,7 @@ wire load = clock_pulse && (
     (mode      == 3'd5 && ((written && control_set) || loaded) && trigger_sampled)
 );
 
-wire enable = ~load && loaded && clock_pulse && ( 
+assign enable = ~load && loaded && clock_pulse && ( 
     (mode      == 3'd0 && gate_sampled) ||
     (mode      == 3'd1) ||
     (mode[1:0] == 2'd2 && gate_sampled) ||
@@ -260,7 +263,6 @@ wire [15:0] counter_minus_1 =
     (bcd && !counter[3:0])  ? { counter[15:4]  - 1'd1,    4'h9 } :
                                 counter - 1'd1;
 
-reg [15:0] counter;
 always @(posedge clk) begin
     if(rst_n == 1'b0) counter <= 16'd0;
     else if(load)     counter <= {counter_m, counter_l[7:1], counter_l[0] & (mode[1:0] != 2'd3)};

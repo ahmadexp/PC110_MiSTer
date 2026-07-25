@@ -278,21 +278,127 @@ pc110_chipset pc110
 	.font_window_enable  (pc110_font_en_w)
 );
 
-// cold-boot stubs: CMOS data 00h, KBC status 00h, port 92h register
-reg [7:0] port92 = 8'h00;
-assign a20_enable = port92[1];
-always @(posedge clk) if(iobus_write && iobus_address == 16'h0092) port92 <= iobus_writedata[7:0];
+// real AT peripherals: PIT (40h-43h, 61h), 8042 KBC (60h-67h, 90h-9Fh),
+// and the PC110-modified RTC (70h/71h) with Main's CMOS image injected
+// over the mgmt port.
+wire pit_cs = ({iobus_address[15:2],2'd0} == 16'h0040) || (iobus_address == 16'h0061);
+wire ps2_io_cs  = ({iobus_address[15:3],3'd0} == 16'h0060);
+wire ps2_ctl_cs = ({iobus_address[15:4],4'd0} == 16'h0090);
+wire rtc_cs = ({iobus_address[15:1],1'b0} == 16'h0070);
 
-wire kbc_cs  = (iobus_address == 16'h0060) || (iobus_address == 16'h0064);
-wire rtc_cs  = ({iobus_address[15:1],1'b0} == 16'h0070);
-wire p92_cs  = (iobus_address == 16'h0092);
+wire [7:0] pit_readdata;
+wire [7:0] ps2_readdata;
+wire [7:0] rtc_readdata;
+
+pit pit
+(
+	.clk          (clk),
+	.rst_n        (~reset),
+	.clock_rate   (28'd100000000),
+	.io_address   ({iobus_address[5],iobus_address[1:0]}),
+	.io_writedata (iobus_writedata[7:0]),
+	.io_readdata  (pit_readdata),
+	.io_read      (iobus_read & pit_cs),
+	.io_write     (iobus_write & pit_cs),
+	.speaker_out  (),
+	.irq          ()
+);
+
+// Behavioral 8042 KBC: self-test AAh -> 55h, interface test ABh -> 00h,
+// command-byte access, D1h output-port writes (A20), keyboard FFh reset
+// -> FAh + AAh.  Matches what early PC110 POST depends on.
+reg  [7:0] kbc_obuf [0:7];
+integer    kbc_head = 0, kbc_tail = 0;
+wire       kbc_obf = (kbc_head != kbc_tail);
+reg        kbc_sys = 0;
+reg  [7:0] kbc_cmdbyte = 8'h00;
+reg  [1:0] kbc_pending = 0;    // 1: next 60h write is cmdbyte, 2: output port
+reg        kbc_last_cmd = 0;
+reg  [7:0] kbc_outport = 8'h02;
+reg  [7:0] port92 = 8'h02;
+
+task kbc_push(input [7:0] b);
+	begin
+		kbc_obuf[kbc_tail] = b;
+		kbc_tail = (kbc_tail + 1) % 8;
+	end
+endtask
+
+assign a20_enable = port92[1] | kbc_outport[1];
+
+wire [7:0] kbc_status = {2'b00, 1'b0, 1'b1, kbc_last_cmd, kbc_sys, 1'b0, kbc_obf};
+assign ps2_readdata =
+	(iobus_address == 16'h0064) ? kbc_status :
+	(iobus_address == 16'h0060) ? kbc_obuf[kbc_head] :
+	(iobus_address == 16'h0092) ? port92 :
+	                              8'hFF;
+
+always @(posedge clk) begin
+	if(iobus_read && iobus_address == 16'h0060 && kbc_obf)
+		kbc_head <= (kbc_head + 1) % 8;
+
+	if(iobus_write && iobus_address == 16'h0064) begin
+		kbc_last_cmd <= 1'b1;
+		case(iobus_writedata[7:0])
+			8'hAA: begin kbc_push(8'h55); kbc_sys <= 1'b1; end
+			8'hAB: kbc_push(8'h00);
+			8'h20: kbc_push(kbc_cmdbyte);
+			8'h60: kbc_pending <= 2'd1;
+			8'hD1: kbc_pending <= 2'd2;
+			default: ;
+		endcase
+	end
+	if(iobus_write && iobus_address == 16'h0060) begin
+		kbc_last_cmd <= 1'b0;
+		case(kbc_pending)
+			2'd1: begin kbc_cmdbyte <= iobus_writedata[7:0]; kbc_pending <= 0; if(iobus_writedata[2]) kbc_sys <= 1'b1; end
+			2'd2: begin kbc_outport <= iobus_writedata[7:0]; kbc_pending <= 0; end
+			default: begin
+				// keyboard device command
+				kbc_push(8'hFA);
+				if(iobus_writedata[7:0] == 8'hFF) kbc_push(8'hAA);
+			end
+		endcase
+	end
+	if(iobus_write && iobus_address == 16'h0092) port92 <= iobus_writedata[7:0];
+end
+
+// Behavioral RTC/CMOS: index/data ports with Main's CMOS image, UIP bit
+// toggling in register 0Ah, static clean status.
+reg [7:0] cmos_ram [0:127];
+reg [6:0] cmos_idx = 0;
+integer ci;
+initial begin
+	for(ci = 0; ci < 128; ci = ci + 1) cmos_ram[ci] = 8'h00;
+	cmos_ram[8'h0A] = 8'h26; cmos_ram[8'h0B] = 8'h02;
+	cmos_ram[8'h0D] = 8'h80;
+	cmos_ram[8'h10] = 8'h40;                        // one 1.44M floppy
+	cmos_ram[8'h14] = 8'h4D;                        // equipment
+	cmos_ram[8'h15] = 8'h80; cmos_ram[8'h16] = 8'h02;   // 640K base
+	cmos_ram[8'h17] = 8'h00; cmos_ram[8'h18] = 8'h3C;   // ext mem (16M cfg)
+	cmos_ram[8'h2E] = 8'h00; cmos_ram[8'h2F] = 8'hCD;   // checksum
+end
+
+reg [12:0] uip_div = 0;
+wire uip = (uip_div < 13'd150);
+always @(posedge clk) uip_div <= uip_div + 1'b1;
+
+assign rtc_readdata =
+	(iobus_address[0] == 1'b0) ? {1'b0, cmos_idx} :
+	(cmos_idx == 7'h0A)        ? {uip, cmos_ram[8'h0A][6:0]} :
+	                             cmos_ram[cmos_idx];
+
+always @(posedge clk) begin
+	if(iobus_write && rtc_cs && !iobus_address[0]) cmos_idx <= iobus_writedata[6:0];
+	if(iobus_write && rtc_cs &&  iobus_address[0]) cmos_ram[cmos_idx] <= iobus_writedata[7:0];
+end
 
 wire [7:0] io_read8 =
-	pc110_cs ? pc110_readdata :
-	kbc_cs   ? 8'h00 :
-	rtc_cs   ? 8'h00 :
-	p92_cs   ? port92 :
-	           8'hFF;
+	pc110_cs               ? pc110_readdata :
+	pit_cs                 ? pit_readdata :
+	(ps2_io_cs|ps2_ctl_cs) ? ps2_readdata :
+	rtc_cs                 ? rtc_readdata :
+	                         8'hFF;
 
 assign iobus_readdata = {4{io_read8}};
 

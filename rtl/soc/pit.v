@@ -66,15 +66,6 @@ always @(posedge clk) begin
     else if(ce_system_counter)  system_clock <= ~system_clock;
 end
 
-//------------------------------------------------------------------------------ read io
-
-always @(posedge clk) if(io_read) io_readdata <=
-    (io_read && io_address == 0) ? counter_0_readdata :
-    (io_read && io_address == 1) ? counter_1_readdata :
-    (io_read && io_address == 2) ? counter_2_readdata :
-    (io_read && io_address[2])   ? { 2'b0, spk_out, counter_1_toggle, 2'b0, speaker_enable, speaker_gate } :
-                                     8'd0; //control address
-
 //------------------------------------------------------------------------------ refresh counter
 
 reg [5:0] counter_1_cnt;
@@ -104,13 +95,24 @@ always @(posedge clk) begin
     else if(io_write && io_address[2]) speaker_enable <= io_writedata[1];
 end
 
+wire spk_out;
 assign speaker_out = spk_out & speaker_enable;
 
-//------------------------------------------------------------------------------ counters
+//------------------------------------------------------------------------------ read io
 
 wire [7:0] counter_0_readdata;
 wire [7:0] counter_1_readdata;
 wire [7:0] counter_2_readdata;
+
+always @(posedge clk) if(io_read) io_readdata <=
+    (io_read && io_address == 0) ? counter_0_readdata :
+    (io_read && io_address == 1) ? counter_1_readdata :
+    (io_read && io_address == 2) ? counter_2_readdata :
+    (io_read && io_address[2])   ? { 2'b0, spk_out, counter_1_toggle, 2'b0, speaker_enable, speaker_gate } :
+                                     8'd0; //control address
+
+//------------------------------------------------------------------------------ counters
+
 
 pit_counter pit_counter_0(
     .clk                (clk),
@@ -150,7 +152,6 @@ pit_counter pit_counter_1(
     .data_out           (counter_1_readdata)    //output [7:0]
 );
 
-wire spk_out;
 pit_counter pit_counter_2(
     .clk                (clk),
     .rst_n              (rst_n),
