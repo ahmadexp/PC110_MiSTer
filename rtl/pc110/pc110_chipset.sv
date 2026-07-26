@@ -402,20 +402,28 @@ module pc110_chipset
 			vstat_flip <= ~vstat_flip;
 	end
 
-	logic [15:0] plog_fifo [0:15];
-	logic  [3:0] plog_head, plog_tail;
+	logic [15:0] plog_fifo [0:511];
+	logic  [8:0] plog_head, plog_tail;
 	logic        io_write_d;
 
 	always_ff @(posedge clk) begin
 		io_write_d <= io_write;
 		if(reset) begin
-			plog_tail <= 4'd0;
+			plog_tail <= 9'd0;
 		end
 		else if(io_write && !io_write_d) begin
 			case(io_address)
-				16'h03BC: begin plog_fifo[plog_tail] <= {8'h50, io_writedata}; plog_tail <= plog_tail + 4'd1; end // 'P'
-				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 4'd1; end // 'E'
-				16'h0191: begin plog_fifo[plog_tail] <= {8'h65, io_writedata}; plog_tail <= plog_tail + 4'd1; end // 'e'
+				16'h03BC: begin plog_fifo[plog_tail] <= {8'h50, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'P' progress
+				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'E' failure hi
+				16'h0191: begin plog_fifo[plog_tail] <= {8'h65, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'e' failure lo
+				// video BIOS progress: C&T extension index writes ('X') mean
+				// the 32 KiB runtime image decompressed and init body started
+				16'h03D6: begin plog_fifo[plog_tail] <= {8'h58, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				// shadow/ROM decode config as POST programs it: tag 80h|index
+				16'h00ED: if(eced_gate && eced_index >= 6'h0C && eced_index <= 6'h12) begin
+					plog_fifo[plog_tail] <= {{2'b10, eced_index}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
 				default: ;
 			endcase
 		end
@@ -429,7 +437,7 @@ module pc110_chipset
 
 	always_ff @(posedge clk) begin
 		if(reset) begin
-			plog_head   <= 4'd0;
+			plog_head   <= 9'd0;
 			plog_bit    <= 4'd0;
 			plog_div    <= 10'd0;
 			plog_second <= 1'b0;
@@ -444,7 +452,7 @@ module pc110_chipset
 				else begin
 					plog_shift <= {1'b1, plog_fifo[plog_head][15:8], 1'b0};
 					plog_code  <= plog_fifo[plog_head][7:0];
-					plog_head  <= plog_head + 4'd1;
+					plog_head  <= plog_head + 1'd1;
 				end
 				plog_second <= ~plog_second;
 				plog_bit    <= 4'd10;

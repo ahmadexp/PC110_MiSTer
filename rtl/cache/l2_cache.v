@@ -206,7 +206,14 @@ wire [3:0] pc110_shadow_index =
 wire pc110_upper_rgn =
 	(CPU_ADDR[ADDRBITS+1:14] >= 'hC) &&
 	(CPU_ADDR[ADDRBITS+1:14] <= 'hF);
-wire rom_rgn = pc110_upper_rgn && ~PC110_SHADOW_WE[pc110_shadow_index];
+// Upper memory is writable regardless of the per-16KiB xAXS write bits.
+// The PC110 video BIOS stores its decompressor pointers into its own
+// C-segment data area (C000:009F-02B7) while POST has those bits clear,
+// so honoring them discards the pointers and the loader never completes.
+// PC110-EMU, which runs this BIOS, likewise backs C0000-FFFFF with plain
+// writable RAM.  PC110_SHADOW_WE is kept wired for future separation of
+// the flash image from shadow RAM (see docs/STATUS.md debt item 1).
+wire rom_rgn = 1'b0;
 wire vga_rgn = (CPU_ADDR[ADDRBITS+1:15] == 'h5)  && ((CPU_ADDR[14:13] & vga_mask) == vga_cmp);
 wire shr_rgn = (CPU_ADDR[ADDRBITS+1:11] == 'h67) && shr_rgn_en;
 wire pc110_font_rgn = PC110_FONT_EN &&
