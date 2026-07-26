@@ -448,6 +448,7 @@ always @(posedge clk) begin
 end
 integer io_count = 0;
 integer ram_write_count = 0;
+integer blocked_write_count = 0;
 
 reg [47:0] io_tail_addrop [0:TRACE_TAIL-1];   // {op(8), addr(16), data(8), pad}
 reg [15:0] io_tail_addr [0:TRACE_TAIL-1];
@@ -522,6 +523,11 @@ always @(posedge clk) begin
 	if(avm_write && !avm_waitrequest) begin
 		ram_write_count <= ram_write_count + 1;
 		if(ram_write_count < 100) $display("MEMW %08x <= %08x be=%x wr_eip=%08x  (t=%0d)", {avm_address,2'b00}, avm_writedata, avm_byteenable, ao486.pipeline_inst.wr_eip, cycles);
+		if(cache.rom_rgn && !cache.shr_rgn) begin
+			blocked_write_count <= blocked_write_count + 1;
+			if(blocked_write_count < 20)
+				$display("BLOCKED-WR %08x we_mask=%04x  (t=%0d)", {avm_address,2'b00}, cache.PC110_SHADOW_WE, cycles);
+		end
 	end
 end
 

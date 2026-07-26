@@ -236,13 +236,19 @@ module pc110_chipset
 		pos[2] = 8'h01;
 	end
 
+	// ROMSET (EC/ED index 0Ch) value 00h opens the whole upper-memory
+	// shadow window for writes; POST wraps its C-segment copy and the
+	// video BIOS decompression in ROMSET open/relock.  Any other value
+	// defers to the per-16KiB xAXS write bits.
+	wire shadow_open_all = (eced[8'h0C] == 8'h00);
+
 	generate
 		genvar g;
 		for(g = 0; g < 4; g = g + 1) begin : g_shadow_decode
-			assign shadow_write_enable[(g*4)+0] = eced[8'h0F+g][0];
-			assign shadow_write_enable[(g*4)+1] = eced[8'h0F+g][2];
-			assign shadow_write_enable[(g*4)+2] = eced[8'h0F+g][4];
-			assign shadow_write_enable[(g*4)+3] = eced[8'h0F+g][6];
+			assign shadow_write_enable[(g*4)+0] = shadow_open_all | eced[8'h0F+g][0];
+			assign shadow_write_enable[(g*4)+1] = shadow_open_all | eced[8'h0F+g][2];
+			assign shadow_write_enable[(g*4)+2] = shadow_open_all | eced[8'h0F+g][4];
+			assign shadow_write_enable[(g*4)+3] = shadow_open_all | eced[8'h0F+g][6];
 			assign shadow_read_enable[(g*4)+0]  = eced[8'h0F+g][1];
 			assign shadow_read_enable[(g*4)+1]  = eced[8'h0F+g][3];
 			assign shadow_read_enable[(g*4)+2]  = eced[8'h0F+g][5];
