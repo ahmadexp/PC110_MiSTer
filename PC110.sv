@@ -181,7 +181,10 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign LED_DISK[1] = 0;
 assign LED_POWER   = 0;
-assign BUTTONS     = {~ps2_reset_n, 1'b0};
+// The KBC reset line is consumed inside rtl/system.v as a CPU-only
+// reset; requesting a framework core reset here would wipe chipset,
+// CMOS, and memory state that POST's shutdown tests rely on.
+assign BUTTONS     = 2'b00;
 assign HDMI_FREEZE = 0;
 
 led hdd_led(clk_sys, |mgmt_req[5:0], LED_DISK[0]);

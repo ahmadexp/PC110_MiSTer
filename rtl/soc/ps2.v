@@ -114,12 +114,21 @@ always @(posedge clk) begin
     else if(sysctl_write && io_address == 4'h2) output_a20_enable <= io_writedata[1];
 end
 
+// The KBC reset is a pulse on real hardware: FEh (or an output-port /
+// port 92h write asserting reset) drives the line low briefly and it
+// returns high on its own.  Latching it low forever would leave the CPU
+// in permanent reset once the consumer stops resetting this module.
+reg [5:0] reset_pulse_cnt;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                           output_reset_n <= 1'b1;
-    else if(cmd_write_output_port)              output_reset_n <= io_writedata[0];
-    else if(cmd_reset)                          output_reset_n <= 1'b0;
-    else if(sysctl_write && io_address == 4'h2) output_reset_n <= ~io_writedata[0];
+    if(rst_n == 1'b0)
+        reset_pulse_cnt <= 6'd0;
+    else if((cmd_write_output_port && ~io_writedata[0]) || cmd_reset ||
+            (sysctl_write && io_address == 4'h2 && io_writedata[0]))
+        reset_pulse_cnt <= 6'd63;
+    else if(reset_pulse_cnt != 6'd0)
+        reset_pulse_cnt <= reset_pulse_cnt - 6'd1;
 end
+always @(posedge clk) output_reset_n <= (reset_pulse_cnt == 6'd0);
 
 //------------------------------------------------------------------------------
 

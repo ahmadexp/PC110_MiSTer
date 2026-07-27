@@ -274,10 +274,26 @@ l2_cache cache
 	.PC110_DRAM_CFG0   (pc110_dram_cfg0)
 );
 
+// A KBC-commanded reset (8042 FEh / output-port bit 0 / port 92h) resets
+// only the CPU on real hardware.  POST's protected-mode shutdown tests
+// depend on this: chipset registers, CMOS (including the shutdown-status
+// byte), KBC state, and memory must all survive so execution can resume
+// through the reset vector.  A full core reset here restarts POST from
+// scratch and produces an endless reboot loop.
+reg  [7:0] kbc_cpu_rst_cnt = 8'd0;
+reg        ps2_reset_n_d = 1'b1;
+always @(posedge clk_sys) begin
+	ps2_reset_n_d <= ps2_reset_n;
+	if(reset)                             kbc_cpu_rst_cnt <= 8'd0;
+	else if(ps2_reset_n_d & ~ps2_reset_n) kbc_cpu_rst_cnt <= 8'd255;
+	else if(kbc_cpu_rst_cnt != 8'd0)      kbc_cpu_rst_cnt <= kbc_cpu_rst_cnt - 8'd1;
+end
+wire kbc_cpu_reset = (kbc_cpu_rst_cnt != 8'd0);
+
 ao486 ao486
 (
 	.clk               (clk_sys),
-	.rst_n             (~reset),
+	.rst_n             (~reset & ~kbc_cpu_reset),
 
 	.cache_disable     (l1_disable),
 
