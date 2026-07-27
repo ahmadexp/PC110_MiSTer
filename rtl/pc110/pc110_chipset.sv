@@ -396,12 +396,16 @@ module pc110_chipset
 
 	// Input Status 1 toggle: one flip per completed read of 3DAh/3BAh.
 	logic io_read_d;
+	logic [7:0] ata_status_reads;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
 		if(reset) vstat_flip <= 1'b0;
 		else if(io_read && !io_read_d &&
 		        (io_address == 16'h03DA || io_address == 16'h03BA))
 			vstat_flip <= ~vstat_flip;
+		if(reset) ata_status_reads <= 8'd0;
+		else if(io_read && !io_read_d && io_address == 16'h01F7)
+			ata_status_reads <= ata_status_reads + 1'd1;
 	end
 
 	logic [15:0] plog_fifo [0:511];
@@ -421,10 +425,16 @@ module pc110_chipset
 				// video BIOS progress: C&T extension index writes ('X') mean
 				// the 32 KiB runtime image decompressed and init body started
 				16'h03D6: begin plog_fifo[plog_tail] <= {8'h58, io_writedata}; plog_tail <= plog_tail + 1'd1; end
-				// ATA command bytes ('D') and device-control writes ('d'):
-				// shows whether the BIOS issues IDENTIFY/READ to the boot disk
+				// ATA task-file trace: command bytes ('D'), device control
+				// ('d'), and every 1F1h-1F6h register write (tag C1h-C6h)
+				// reconstruct the BIOS's drive-detection conversation.
 				16'h01F7: begin plog_fifo[plog_tail] <= {8'h44, io_writedata}; plog_tail <= plog_tail + 1'd1; end
 				16'h03F6: begin plog_fifo[plog_tail] <= {8'h64, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				16'h01F1, 16'h01F2, 16'h01F3,
+				16'h01F4, 16'h01F5, 16'h01F6: begin
+					plog_fifo[plog_tail] <= {5'b11000, io_address[2:0], io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
 				// shadow/ROM decode config as POST programs it: tag 80h|index
 				16'h00ED: if(eced_gate && eced_index >= 6'h0C && eced_index <= 6'h12) begin
 					plog_fifo[plog_tail] <= {{2'b10, eced_index}, io_writedata};
@@ -432,6 +442,13 @@ module pc110_chipset
 				end
 				default: ;
 			endcase
+		end
+		// every 16th ATA status poll of 1F7h, log tag 'r' with the count:
+		// shows the BIOS polling for BSY-clear without flooding the FIFO
+		else if(io_read && !io_read_d && io_address == 16'h01F7 &&
+		        ata_status_reads[3:0] == 4'hF) begin
+			plog_fifo[plog_tail] <= {8'h72, ata_status_reads};
+			plog_tail <= plog_tail + 1'd1;
 		end
 	end
 
