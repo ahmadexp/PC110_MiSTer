@@ -421,6 +421,10 @@ module pc110_chipset
 				// video BIOS progress: C&T extension index writes ('X') mean
 				// the 32 KiB runtime image decompressed and init body started
 				16'h03D6: begin plog_fifo[plog_tail] <= {8'h58, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				// ATA command bytes ('D') and device-control writes ('d'):
+				// shows whether the BIOS issues IDENTIFY/READ to the boot disk
+				16'h01F7: begin plog_fifo[plog_tail] <= {8'h44, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				16'h03F6: begin plog_fifo[plog_tail] <= {8'h64, io_writedata}; plog_tail <= plog_tail + 1'd1; end
 				// shadow/ROM decode config as POST programs it: tag 80h|index
 				16'h00ED: if(eced_gate && eced_index >= 6'h0C && eced_index <= 6'h12) begin
 					plog_fifo[plog_tail] <= {{2'b10, eced_index}, io_writedata};

@@ -496,7 +496,10 @@ always @* begin
     pc110_mgmt_data = mgmt_writedata;
     case(mgmt_address)
         8'h10: pc110_mgmt_data = 8'h40; // one 1.44 MB external floppy
+        8'h12: pc110_mgmt_data = 8'hFF; // both fixed disks present, extended type
         8'h14: pc110_mgmt_data = 8'h25; // PC110 equipment byte
+        8'h19: pc110_mgmt_data = 8'h7F; // drive 0 extended type (live capture)
+        8'h1A: pc110_mgmt_data = 8'h7F; // drive 1 extended type (live capture)
         8'h15: pc110_mgmt_data = 8'h80; // 640 KiB base memory
         8'h16: pc110_mgmt_data = 8'h02;
         8'h17: pc110_mgmt_data = 8'h00; // 19 MiB above 1 MiB
