@@ -110,29 +110,23 @@ assign io_readdata = io_master_cs ? mas_readdata : io_slave_cs ? sla_readdata : 
 //------------------------------------------------------------------------------
 
 reg [7:0] pag_readdata;
-always @(posedge clk) begin
-	case(io_address[3:0])
-			4'h1: pag_readdata <= sla_page[2];
-			4'h2: pag_readdata <= sla_page[3];
-			4'h3: pag_readdata <= sla_page[1];
-			4'h7: pag_readdata <= sla_page[0];
-			4'h9: pag_readdata <= mas_page[2];
-			4'hA: pag_readdata <= mas_page[3];
-			4'hB: pag_readdata <= mas_page[1];
-			4'hF: pag_readdata <= mas_page[0];
-		default: pag_readdata <= pag_extra;
-	endcase
-end
+always @(posedge clk) pag_readdata <= pag_extra[io_address[3:0]];
 
 reg [7:0] sla_page[4];
 reg [7:0] mas_page[4];
-reg [7:0] pag_extra;
+// All sixteen page-register locations are distinct scratch bytes on real
+// AT chipsets; the PC110 BIOS POST (checkpoint 07 at F000:4868) walks
+// 81h-8Eh with a per-port pattern and halts if any location fails to
+// retain its own value, so a single shared byte for the non-channel
+// locations is not sufficient.
+reg [7:0] pag_extra[16];
 
+integer pg;
 always @(posedge clk) begin
 	if(~rst_n) begin
 		sla_page[0] <= 0; sla_page[1] <= 0; sla_page[2] <= 0; sla_page[3] <= 0;
 		mas_page[0] <= 0; mas_page[1] <= 0; mas_page[2] <= 0; mas_page[3] <= 0;
-		pag_extra   <= 0;
+		for(pg = 0; pg < 16; pg = pg + 1) pag_extra[pg] <= 0;
 	end
 	else if(page_write) begin
 		case(io_address[3:0])
@@ -144,8 +138,9 @@ always @(posedge clk) begin
 				4'hA: mas_page[3] <= io_writedata;
 				4'hB: mas_page[1] <= io_writedata;
 				4'hF: mas_page[0] <= io_writedata;
-			default: pag_extra   <= io_writedata;
+			default: ;
 		endcase
+		pag_extra[io_address[3:0]] <= io_writedata;
 	end
 end
 
