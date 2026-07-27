@@ -240,8 +240,7 @@ localparam CONF_STR =
 	"P2-,RAM: 20 MB (4 MB onboard + 16 MB card);",
 `ifndef DEBUG
 	"P2-;",
-	"D2D1P2O56,CPU Clock,90MHz,15MHz,30MHz,56MHz;",
-	"h0P2O7,Overclock,Off,100Mhz;",
+	"P2-,CPU: 486SX-class, 30MHz timing profile;",
 	"D2P2OF,L1 Cache,On,Off;",
 	"D2P2OG,L2 Cache,On,Off;",
 `endif
@@ -427,8 +426,10 @@ pll_cfg pll_cfg
 	.reconfig_from_pll(reconfig_from_pll)
 );
 
-reg [2:0] clk_req;
-always @(posedge clk_sys) clk_req <= {status[7], syscfg[7] ? syscfg[1:0] : status[6:5]};
+// The PC110 uses a 33 MHz 486SX.  ao486's closest characterized profile is
+// 30 MHz.  Force it here so a saved AO486 configuration cannot accidentally
+// select the inherited 56/90/100 MHz overclock profiles during PC110 POST.
+wire [2:0] clk_req = 3'd2;
 
 reg [2:0] speed;
 always @(posedge CLK_50M) begin

@@ -43,6 +43,7 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// IBM PC110 VL82C420 shadow-write state.  One bit per 16 KiB block
 	// from C0000 through FFFFF.
 	input  [15:0] PC110_SHADOW_WE,
+	input   [7:0] PC110_ROMSET,
 
 	// The 1 MiB font ROM is loaded at system DDR address 0x32000000 and
 	// exposed as a 7-bit-banked 8 KiB window (normally DE000-DFFFF).
@@ -233,7 +234,17 @@ wire [ADDRBITS:0] pc110_font_addr =
 // region does not respond (open bus).
 wire pc110_cfg_settled = (PC110_DRAM_CFG0[3:0] == 4'hB);
 wire pc110_fold = ~pc110_cfg_settled && (CPU_ADDR < 30'h00028000);
-wire [29:0] cpu_addr_m = pc110_fold ? (CPU_ADDR & ~30'h00000700) : CPU_ADDR;
+// ROMSET=19h is the PC110's normal split-ROM decode. In this mode the
+// 64 KiB video option ROM physically stored at E0000h appears at C0000h.
+// Alias writes as well because the C&T BIOS keeps private data in its
+// otherwise ROM-addressed segment.
+wire pc110_vga_rom_alias =
+	(PC110_ROMSET == 8'h19) &&
+	(CPU_ADDR[ADDRBITS+1:14] == 'hC);
+wire [29:0] pc110_rom_addr =
+	pc110_vga_rom_alias ? (CPU_ADDR + 30'h00008000) : CPU_ADDR;
+wire [29:0] cpu_addr_m = pc110_fold ?
+	(pc110_rom_addr & ~30'h00000700) : pc110_rom_addr;
 
 wire ram_rgn = (CPU_ADDR < 30'h00100000) ||
 	((CPU_ADDR < 30'h00500000) && pc110_cfg_settled) ||

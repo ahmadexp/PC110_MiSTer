@@ -20,7 +20,7 @@ Two important corrections follow from that rule:
 
 | Area | State | Notes |
 |---|---|---|
-| CPU | inherited | ao486 no-FPU core; use the 30 MHz setting as the closest current PC110 timing profile |
+| CPU | inherited | ao486 no-FPU core; PLL power-on and runtime selection are both forced to its 30 MHz profile, the closest characterized PC110 timing |
 | RAM | implemented | 20 MiB CPU-visible boundary |
 | BIOS flash | implemented for bring-up | complete 256 KiB image at `C0000h-FFFFFh`; shadow RAM currently shares the same DDR backing |
 | VL82C420 gates | implemented | observed SCAMP, block-2, and EC/ED unlock sequences |
@@ -47,7 +47,7 @@ Two important corrections follow from that rule:
 5. PCMCIA windows, card insertion, interrupts, and DMA are not connected.
 6. ES488 mixer/DSP identification and exact IRQ/DMA behavior remain to be
    added on top of the inherited sound path.
-7. The ao486 30 MHz profile is the closest currently available setting; a
+7. The forced ao486 30 MHz profile is the closest currently available setting; a
    separately verified 33.333 MHz CPU/timer profile remains future work.
 
 ## Core identity and Main support

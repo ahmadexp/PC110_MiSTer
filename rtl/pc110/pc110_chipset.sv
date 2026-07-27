@@ -23,6 +23,7 @@ module pc110_chipset
 	// bit 1 selects shadow RAM for reads.
 	output logic [15:0] shadow_write_enable,
 	output logic [15:0] shadow_read_enable,
+	output logic  [7:0] romset,
 
 	output logic  [6:0] font_bank_select,
 	output logic  [7:0] font_window_segment,
@@ -41,8 +42,8 @@ module pc110_chipset
 	output logic        postlog_tx
 );
 
-	// clk_sys is 90 MHz; 90e6 / 115200 = 781.25
-	localparam int unsigned POSTLOG_DIV = 782;
+	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
+	localparam int unsigned POSTLOG_DIV = 260;
 
 	logic [7:0] scamp [0:127];
 	logic [7:0] block2[0:255];
@@ -241,6 +242,7 @@ module pc110_chipset
 	// video BIOS decompression in ROMSET open/relock.  Any other value
 	// defers to the per-16KiB xAXS write bits.
 	wire shadow_open_all = (eced[8'h0C] == 8'h00);
+	assign romset = eced[8'h0C];
 
 	generate
 		genvar g;

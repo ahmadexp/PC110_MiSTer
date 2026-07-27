@@ -201,6 +201,7 @@ wire  [7:0] pc110_readdata;
 wire        pc110_cs;
 wire [15:0] pc110_shadow_write_enable;
 wire [15:0] pc110_shadow_read_enable;
+wire  [7:0] pc110_romset;
 wire  [6:0] pc110_font_bank;
 wire  [7:0] pc110_font_segment;
 wire        pc110_font_enable;
@@ -266,6 +267,7 @@ l2_cache cache
 	.VGA_FB_EN         (video_fb_en),
 
 	.PC110_SHADOW_WE   (pc110_shadow_write_enable),
+	.PC110_ROMSET      (pc110_romset),
 	.PC110_FONT_BANK   (pc110_font_bank),
 	.PC110_FONT_SEG    (pc110_font_segment),
 	.PC110_FONT_EN     (pc110_font_enable),
@@ -388,6 +390,7 @@ pc110_chipset pc110
 	.io_cs               (pc110_cs),
 	.shadow_write_enable (pc110_shadow_write_enable),
 	.shadow_read_enable  (pc110_shadow_read_enable),
+	.romset              (pc110_romset),
 	.font_bank_select    (pc110_font_bank),
 	.font_window_segment (pc110_font_segment),
 	.font_window_enable  (pc110_font_enable),

@@ -494,6 +494,8 @@ always @(posedge clk) begin
 	if(iobus_write && (iobus_address == 16'h00EC || iobus_address == 16'h00ED))
 		$display("ECED %s %02x  caller=%08x t=%0d", (iobus_address==16'h00EC)?"idx":"dat", iobus_writedata[7:0], last_caller_eip, cycles);
 	if(iobus_write) begin
+		if(iobus_address == 16'h03BC || iobus_address == 16'h0190 || iobus_address == 16'h0191 || iobus_address == 16'h03D6 || iobus_address == 16'h00ED)
+			$display("POSTLOG_IO %04x <= %02x  caller=%08x (t=%0d)", iobus_address, iobus_writedata[7:0], last_caller_eip, cycles);
 		io_tail_addr[io_tail_pos] <= iobus_address;
 		io_tail_data[io_tail_pos] <= iobus_writedata[7:0];
 		io_tail_iswr[io_tail_pos] <= 1'b1;

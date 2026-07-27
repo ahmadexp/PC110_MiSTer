@@ -8,6 +8,7 @@ quartus_image="${QUARTUS_IMAGE:-ghcr.io/raetro/quartus:mister}"
 
 "${docker_bin}" --context "${docker_context}" run --rm \
   --platform linux/amd64 \
+  --user "$(id -u):$(id -g)" \
   -v "${repo_dir}:/build" \
   -w /build \
   "${quartus_image}" \

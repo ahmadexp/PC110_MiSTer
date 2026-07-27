@@ -18,6 +18,7 @@ and placeholder parts.
 ## What is implemented
 
 - ao486 486-class CPU, AT peripherals, IDE, floppy, VGA, keyboard, and mouse
+- a forced 30 MHz ao486 CPU profile, immune to stale AO486 overclock settings
 - PC110 memory geometry: 4 MiB planar RAM plus the 16 MiB expansion card
 - the 256 KiB PC110 flash mapped linearly at `C0000h-FFFFFh`
 - VL82C420/SCAMP configuration interfaces at `22h/23h`, `24h/25h`,

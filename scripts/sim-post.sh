@@ -35,6 +35,8 @@ xxd -p -c1 "${repo_dir}/artifacts/roms/pc110_bios.bin" > "${build_dir}/pc110_bio
   echo rtl/common/simple_fifo.v
   echo rtl/common/simple_mult.v
   echo rtl/soc/iobus.v
+  echo rtl/soc/pit.v
+  echo rtl/soc/pit_counter.v
   echo rtl/pc110/pc110_chipset.sv
   echo artifacts/test/altera_mf.v
   echo artifacts/test/cpu_export.v
