@@ -411,7 +411,8 @@ pc110_chipset pc110
 	.font_window_segment (pc110_font_segment),
 	.font_window_enable  (pc110_font_enable),
 	.dram_cfg0           (pc110_dram_cfg0),
-	.postlog_tx          (pc110_postlog_tx)
+	.postlog_tx          (pc110_postlog_tx),
+	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8)
 );
 
 iobus iobus

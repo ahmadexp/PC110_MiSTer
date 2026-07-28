@@ -39,7 +39,10 @@ module pc110_chipset
 	// (3BCh) and failure-code ports (190h/191h) is streamed out this
 	// UART line at 115200 baud as a tag byte ('P', 'E', 'e') followed
 	// by the code byte.  Idle high.
-	output logic        postlog_tx
+	output logic        postlog_tx,
+
+	// value returned on the shared I/O read bus, for the ATA trace
+	input  logic  [7:0] io_snoop
 );
 
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
@@ -397,6 +400,7 @@ module pc110_chipset
 	// Input Status 1 toggle: one flip per completed read of 3DAh/3BAh.
 	logic io_read_d;
 	logic [7:0] ata_status_reads;
+	logic [7:0] ata_last_status = 8'hDE;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
 		if(reset) vstat_flip <= 1'b0;
@@ -443,8 +447,15 @@ module pc110_chipset
 				default: ;
 			endcase
 		end
-		// every 16th ATA status poll of 1F7h, log tag 'r' with the count:
-		// shows the BIOS polling for BSY-clear without flooding the FIFO
+		// log the value of every 1F7h status read when it changes (tag
+		// 'v'), plus every 16th poll count (tag 'r'): reconstructs both
+		// what the BIOS saw and how long it polled
+		else if(io_read_d && !io_read && io_address == 16'h01F7 &&
+		        io_snoop != ata_last_status) begin
+			ata_last_status <= io_snoop;
+			plog_fifo[plog_tail] <= {8'h76, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
 		else if(io_read && !io_read_d && io_address == 16'h01F7 &&
 		        ata_status_reads[3:0] == 4'hF) begin
 			plog_fifo[plog_tail] <= {8'h72, ata_status_reads};
