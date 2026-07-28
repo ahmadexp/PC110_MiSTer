@@ -114,8 +114,15 @@ wire [7:0] io_readdata_next =
     (ram_address == 7'h0E) ? (ram_q & 8'h3F) :
     (ram_address == 7'h34 & memcfg) ? 8'h00 :
     (ram_address == 7'h35 & memcfg) ? 8'h00 :
-    (ram_address == 7'h38) ? {2'b00, bootcfg[5:4], 4'h1} :
-    (ram_address == 7'h3D) ? {2'b00, bootcfg[3:2], 2'b00, bootcfg[1:0]} :
+    // CMOS B8h-BFh (aliased to 38h-3Fh on this 128-byte RTC) hold the PC110
+    // extended-CMOS checksum block.  POST's 184 check (F000:8FDF) sums
+    // B8h..BEh, stopping at the first zero: an empty block (B8h==0) is
+    // skipped.  Return 0 for 38h/3Fh so no 184 error is logged (a logged
+    // error blocks disk boot).  The ao486 boot-config aliases are unused on
+    // PC110.
+    (ram_address == 7'h38) ? 8'h00 :
+    (ram_address == 7'h3D) ? 8'h00 :
+    (ram_address == 7'h3F) ? 8'h00 :
     (ram_address == 7'h32) ? rtc_century :
     (ram_address == 7'h37) ? rtc_century :
                              ram_q;

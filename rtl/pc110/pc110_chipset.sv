@@ -269,7 +269,14 @@ module pc110_chipset
 			16'h0025: io_readdata = block2_gate ? block2[block2_index] : 8'hFF;
 			16'h004F: io_readdata = 8'hFF; // confirmed I/O-delay port
 			16'h0074: io_readdata = 8'hFF;
-			16'h0076: io_readdata = scamp_gate ? scamp[scamp_index] : 8'hFF;
+			// Index 0 (and 1) of this bank are readable even while the
+			// SCAMP config gate is locked: POST's memory-config check at
+			// F000:4347 reads index 0 (bits[1:0] must be clear) and the
+			// memory sizer reads index 1 without opening the 22h/23h gate.
+			// Returning 0xFF there makes bits[1:0]=1 -> spurious 221 error,
+			// which then blocks disk boot.  scamp[0]=00h, scamp[1]=BBh.
+			16'h0076: io_readdata = (scamp_gate || scamp_index <= 7'h01) ?
+			                        scamp[scamp_index] : 8'hFF;
 			16'h0094: io_readdata = planar_setup;
 			16'h0098: io_readdata = planar_control;
 			16'h00EC: io_readdata = 8'hFF;

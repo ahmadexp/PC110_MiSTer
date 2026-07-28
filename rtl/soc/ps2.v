@@ -625,24 +625,69 @@ wire ps2_kb_write_done = keyb_state == PS2_SEND_FINISHED;
 
 wire ps2_kb_reply_done = keyb_reply_valid && keyb_fifo_counter < 7'd60 && ~(keyb_recv_final);
 
-// F1 make-code injector for the "Enter BIOS Setup" menu action.  While
-// inject_f1 is held, pulse a write of 3Bh into the keyboard FIFO roughly
-// every 2^22 cycles, so an F1 keypress is present across the whole POST
-// window regardless of exactly when the BIOS polls for it.
+// Keyboard-device command responder + F1 injector, both writing the
+// keyboard FIFO via inj_wr/inj_data.
+//
+// Responder: the PC110 BIOS keyboard POST (F000:6457) sends device
+// commands to port 60h (reset 0xFF, identify 0xF2, ...) and expects the
+// standard replies within a short timeout.  The real ao486 path relays
+// the command over the emulated PS/2 serial link to the HPS keyboard and
+// waits for the serial round-trip, which is far slower than the PC110
+// BIOS timeout -> no reply in time -> error 301 is logged, and any logged
+// POST error blocks disk boot (INT19 gate at F000:8131).  Generate the
+// device replies locally and immediately: ACK 0xFA, then command-specific
+// bytes (reset -> BAT 0xAA; identify -> 0xAB 0x83).  Real keystrokes still
+// arrive over the serial receive path unchanged.
+//
+// F1 injector: for the "Enter BIOS Setup" menu action, inject F1 (3Bh)
+// while inject_f1 is held.
 reg        inj_wr;
 reg  [7:0] inj_data;
 reg [21:0] inj_ctr;
+reg        wtk_d;
+reg        kr_busy;
+reg  [1:0] kr_pos;
+reg  [1:0] kr_len;
+reg  [7:0] kr_b1, kr_b2;
+
 always @(posedge clk) begin
     inj_wr <= 1'b0;
-    if(rst_n == 1'b0)   inj_ctr <= 22'd0;
-    else if(inject_f1) begin
-        inj_ctr <= inj_ctr + 22'd1;
-        if(inj_ctr == 22'd0) begin
-            inj_wr   <= 1'b1;
-            inj_data <= 8'h3B;
+    wtk_d  <= write_to_keyb;
+
+    if(rst_n == 1'b0) begin
+        inj_ctr <= 22'd0;
+        kr_busy <= 1'b0;
+    end
+    else begin
+        // F1 injection for Enter-BIOS (only active during the menu action)
+        if(inject_f1) begin
+            inj_ctr <= inj_ctr + 22'd1;
+            if(inj_ctr == 22'd0) begin inj_wr <= 1'b1; inj_data <= 8'h3B; end
+        end
+        else inj_ctr <= 22'd0;
+
+        // capture a new keyboard-device command
+        if(write_to_keyb && !wtk_d) begin
+            kr_busy <= 1'b1;
+            kr_pos  <= 2'd0;
+            case(io_writedata)
+                8'hFF: begin kr_b1 <= 8'hAA; kr_b2 <= 8'h00; kr_len <= 2'd2; end // reset -> FA,AA(BAT)
+                8'hF2: begin kr_b1 <= 8'hAB; kr_b2 <= 8'h83; kr_len <= 2'd3; end // identify -> FA,AB,83
+                default: begin kr_b1 <= 8'h00; kr_b2 <= 8'h00; kr_len <= 2'd1; end // ACK only
+            endcase
+        end
+        // drain the response into the FIFO (skip a cycle used by F1 inject)
+        else if(kr_busy && !inj_wr) begin
+            inj_wr <= 1'b1;
+            case(kr_pos)
+                2'd0:    inj_data <= 8'hFA;
+                2'd1:    inj_data <= kr_b1;
+                default: inj_data <= kr_b2;
+            endcase
+            kr_pos <= kr_pos + 2'd1;
+            if(kr_pos + 2'd1 >= kr_len) kr_busy <= 1'b0;
         end
     end
-    else inj_ctr <= 22'd0;
 end
 
 simple_fifo #(
