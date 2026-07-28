@@ -250,12 +250,21 @@ reg status_mousebufferfull;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                                   status_mousebufferfull <= 1'b0;
     else if(io_read_valid && io_address[2:0] == 3'd0)   status_mousebufferfull <= 1'b0;
-    // Do not surface mouse data on the shared output buffer while the mouse
-    // is disabled (the BIOS sends 0xA7 before its keyboard POST).  Without
-    // this, spurious/streaming mouse-device bytes steal the port-60h reads
-    // of the keyboard flush, so the keyboard test never sees the keyboard
-    // and logs error 301 - which blocks disk boot.
-    else if(outputbuffer_idle && ~(mouse_fifo_empty) && ~disable_mouse) status_mousebufferfull <= 1'b1;
+    // Disabling the aux drops mouse data from the shared output buffer.
+    // The PC110 BIOS keyboard POST resets the mouse (0xD4,0xFF) while the
+    // aux is briefly enabled, which sets this flag, THEN disables the aux
+    // (command byte 0x65) before the keyboard init commands.  Real hardware
+    // never hits this because a real PS/2 mouse is far too slow to have
+    // answered before the aux is disabled; our hps_io mouse answers
+    // immediately, so the flag would latch and stay stuck (only a port-60h
+    // read clears it, and the BIOS never reads it - it disabled the aux
+    // instead).  A stuck flag routes port-60h reads to mouse data, blocks
+    // the keyboard FIFO from draining, and pins AUXOBF=1 so the BIOS
+    // discards keyboard ACKs as mouse data -> retries every keyboard
+    // command 6x, gives up, logs 301, blocks disk boot.  Clearing it while
+    // the aux is disabled matches the real-hardware outcome.
+    else if(disable_mouse)                              status_mousebufferfull <= 1'b0;
+    else if(outputbuffer_idle && ~(mouse_fifo_empty))   status_mousebufferfull <= 1'b1;
 end
 
 reg status_outputbufferfull;
