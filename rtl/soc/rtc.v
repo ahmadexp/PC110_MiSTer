@@ -104,6 +104,14 @@ wire [7:0] io_readdata_next =
                                1'b0, crb_binarymode, crb_24hour, crb_daylightsaving } :
     (ram_address == 7'h0C) ? { irq, periodic_interrupt, alarm_interrupt, update_interrupt, 4'd0 } :
     (ram_address == 7'h0D) ? 8'h80 :
+    // Diagnostic-status byte: force bits 7 (power lost) and 6 (checksum
+    // bad) clear.  POST sets them from the fresh-CMOS config errors (dead
+    // battery, bad date), and the INT19 boot-list builder at F000:8874
+    // tests bits 6+7 - if either is set it ignores the CMOS boot order
+    // (which we set to HDD-first) and falls back to a floppy-first list,
+    // so the internal disk is never booted.  Masking them makes the BIOS
+    // honor the configured boot order.
+    (ram_address == 7'h0E) ? (ram_q & 8'h3F) :
     (ram_address == 7'h34 & memcfg) ? 8'h00 :
     (ram_address == 7'h35 & memcfg) ? 8'h00 :
     (ram_address == 7'h38) ? {2'b00, bootcfg[5:4], 4'h1} :
