@@ -53,6 +53,12 @@ module ps2
 	output                  ps2_kbclk_out,
 	output                  ps2_kbdat_out,
 
+	// "Enter BIOS Setup" menu action: while held, periodically inject the
+	// F1 make code into the keyboard buffer so POST enters IBM Easy-Setup
+	// without a physical keypress.  8042 translation is on during POST, so
+	// the buffer holds set-1 codes (F1 make = 3Bh).
+	input                   inject_f1,
+
 	//ps2 mouse
 	input                   ps2_mouseclk,
 	input                   ps2_mousedat,
@@ -619,6 +625,26 @@ wire ps2_kb_write_done = keyb_state == PS2_SEND_FINISHED;
 
 wire ps2_kb_reply_done = keyb_reply_valid && keyb_fifo_counter < 7'd60 && ~(keyb_recv_final);
 
+// F1 make-code injector for the "Enter BIOS Setup" menu action.  While
+// inject_f1 is held, pulse a write of 3Bh into the keyboard FIFO roughly
+// every 2^22 cycles, so an F1 keypress is present across the whole POST
+// window regardless of exactly when the BIOS polls for it.
+reg        inj_wr;
+reg  [7:0] inj_data;
+reg [21:0] inj_ctr;
+always @(posedge clk) begin
+    inj_wr <= 1'b0;
+    if(rst_n == 1'b0)   inj_ctr <= 22'd0;
+    else if(inject_f1) begin
+        inj_ctr <= inj_ctr + 22'd1;
+        if(inj_ctr == 22'd0) begin
+            inj_wr   <= 1'b1;
+            inj_data <= 8'h3B;
+        end
+    end
+    else inj_ctr <= 22'd0;
+end
+
 simple_fifo #(
     .width      (8),
     .widthu     (6)
@@ -626,11 +652,11 @@ simple_fifo #(
 keyb_fifo(
     .clk        (clk),
     .rst_n      (rst_n),
-    
+
     .sclr       (cmd_self_test),                                                                                                //input
-    
-    .wrreq      (ps2_kb_reply_done || (keyb_recv_final && (~(translate) || keyb_recv_buffer != 8'hF0))),                        //input
-    .data       ((ps2_kb_reply_done)? keyb_reply : (translate)? ({ keyb_translate_escape, 7'd0 } | trans) : keyb_recv_buffer),  //input [7:0]
+
+    .wrreq      (inj_wr || ps2_kb_reply_done || (keyb_recv_final && (~(translate) || keyb_recv_buffer != 8'hF0))),              //input
+    .data       (inj_wr ? inj_data : (ps2_kb_reply_done)? keyb_reply : (translate)? ({ keyb_translate_escape, 7'd0 } | trans) : keyb_recv_buffer),  //input [7:0]
     .full       (keyb_fifo_full),                                                                                               //output
     .usedw      (keyb_fifo_usedw),                                                                                              //output [5:0]
     

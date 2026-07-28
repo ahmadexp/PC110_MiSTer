@@ -266,6 +266,8 @@ localparam CONF_STR =
 	"OP,Joystick Mode,2 Joysticks,2 Sticks;",
 	"-;",
 	"R0,Reset and apply HDD;",
+	"R42,Reset;",
+	"R41,Enter BIOS Setup (F1);",
 	"J,Button 1,Button 2,Button 3,Button 4,Start,Select,R1,L1,R2,L2;",
 	"jn,A,B,X,Y,Start,Select,R,L;",
 	"I,",
@@ -766,6 +768,7 @@ system system
 	.ps2_kbdat_in         (ps2_kbd_data_out),
 	.ps2_kbclk_out        (ps2_kbd_clk_in),
 	.ps2_kbdat_out        (ps2_kbd_data_in),
+	.inject_f1            (inject_f1),
 
 	.ps2_mouseclk_in      (ps2_mouse_clk_out),
 	.ps2_mousedat_in      (ps2_mouse_data_out),
@@ -833,12 +836,46 @@ wire       ps2_reset_n;
 reg memcfg = 1;
 always @(posedge clk_sys) if(reset) memcfg <= 1;
 
+// "Enter BIOS Setup" (status[41]) and "Reset" (status[42]) menu actions.
+// Both pulse the core reset; Enter BIOS additionally holds inject_f1 for a
+// few seconds so POST sees F1 and opens IBM Easy-Setup.  clk_sys is
+// 90 MHz, so the 28-bit counters span roughly 1.5 s (reset) and 3 s (F1).
+reg        inject_f1;
+always @(posedge clk_sys) begin
+	reg        old_bios = 0, old_rst2 = 0;
+	reg [27:0] bios_rst_cnt = 0;
+	reg [28:0] bios_f1_cnt  = 0;
+	reg [27:0] mrst_cnt     = 0;
+
+	old_bios <= status[41];
+	old_rst2 <= status[42];
+
+	if(status[41] & ~old_bios) begin
+		bios_rst_cnt <= 28'hFFFFFFF;
+		bios_f1_cnt  <= 29'h1FFFFFFF;
+	end
+	else begin
+		if(bios_rst_cnt) bios_rst_cnt <= bios_rst_cnt - 1'b1;
+		if(bios_f1_cnt)  bios_f1_cnt  <= bios_f1_cnt  - 1'b1;
+	end
+
+	if(status[42] & ~old_rst2) mrst_cnt <= 28'hFFFFFFF;
+	else if(mrst_cnt)          mrst_cnt <= mrst_cnt - 1'b1;
+
+	// hold F1 injection only after the enter-BIOS reset window ends, so it
+	// lands during POST rather than while the CPU is held in reset
+	inject_f1 <= |bios_f1_cnt & ~|bios_rst_cnt;
+	menu_reset <= |bios_rst_cnt | |mrst_cnt;
+end
+
+reg menu_reset;
+
 reg reset;
 always @(posedge clk_sys) begin
 	reg init_reset_n = 0;
 	reg old_rst = 0;
 
-	reset <= buttons[1] | status[0] | RESET | ~init_reset_n;
+	reset <= buttons[1] | status[0] | RESET | ~init_reset_n | menu_reset;
 
 	old_rst <= status[0];
 	if(old_rst & ~status[0]) init_reset_n <= 1;

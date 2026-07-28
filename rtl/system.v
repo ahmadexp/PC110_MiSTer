@@ -28,6 +28,7 @@ module system
 
 	input         ps2_kbclk_in,
 	input         ps2_kbdat_in,
+	input         inject_f1,
 	output        ps2_kbclk_out,
 	output        ps2_kbdat_out,
 	input         ps2_mouseclk_in,
@@ -632,6 +633,7 @@ ps2 ps2
 	.ps2_kbdat         (ps2_kbdat_in),
 	.ps2_kbclk_out     (ps2_kbclk_out),
 	.ps2_kbdat_out     (ps2_kbdat_out),
+	.inject_f1         (inject_f1),
 
 	.ps2_mouseclk      (ps2_mouseclk_in),
 	.ps2_mousedat      (ps2_mousedat_in),
