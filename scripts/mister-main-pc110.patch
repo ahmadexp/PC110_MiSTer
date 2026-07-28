@@ -1,5 +1,5 @@
 diff --git a/ide.cpp b/ide.cpp
-index 1452a5f..e4ba847 100644
+index 1452a5f..6152528 100644
 --- a/ide.cpp
 +++ b/ide.cpp
 @@ -473,9 +473,16 @@ void ide_img_set(uint32_t drvnum, fileTYPE *f, int cd, int sectors, int heads, i
@@ -21,6 +21,26 @@ index 1452a5f..e4ba847 100644
  				else ide_set_geometry(drive, drive->spt, drive->heads);
  			}
  			else ide_set_geometry(drive, sectors, heads);
+@@ -946,7 +953,18 @@ static int handle_hdd(ide_config *ide)
+ 
+ 	case 0x40: // READ VERIFY
+ 		dbg_printf("Received read verify command. Not implemented but returning OK.\n");
+-		ide->regs.status = ATA_STATUS_RDY | ATA_STATUS_IRQ;
++		ide->regs.status = ATA_STATUS_RDY | ATA_STATUS_DSC | ATA_STATUS_IRQ;
++		ide->regs.error = 0;
++		ide_set_regs(ide);
++		break;
++
++	case 0x90: // EXECUTE DEVICE DIAGNOSTIC
++		// The PC110 BIOS fixed-disk validation (INT13 AH=14h) issues this.
++		// Report the drive-0-passed code (01h) with ready status; without a
++		// handler it fell to default and aborted, failing validation so the
++		// disk was initialized but never counted or booted.
++		ide->regs.error = 0x01;
++		ide->regs.status = ATA_STATUS_RDY | ATA_STATUS_DSC | ATA_STATUS_IRQ;
+ 		ide_set_regs(ide);
+ 		break;
+ 
 diff --git a/scaler.cpp b/scaler.cpp
 index 96e7851..462625e 100644
 --- a/scaler.cpp
