@@ -21,6 +21,13 @@ fi
 # Main's x86 support (IDE image mounting, CMOS) activates by core name, so a
 # Main binary that recognizes PC110 is required; see docs/STATUS.md.
 
+# Remove earlier PC110 builds before staging the new one so the core list
+# does not accumulate stale bitstreams across rapid iteration.  Set
+# KEEP_OLD_RBF=1 to retain them.
+if [[ "${KEEP_OLD_RBF:-0}" != "1" ]]; then
+  ssh "${mister_host}" "rm -f /media/fat/_Computer/PC110_*.rbf"
+fi
+
 ssh "${mister_host}" "mkdir -p '${remote_stage}'"
 
 scp "${rbf_path}" "${mister_host}:/media/fat/_Computer/PC110_${stamp}.rbf"
