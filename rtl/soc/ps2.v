@@ -92,13 +92,7 @@ wire [7:0] io_readdata_next =
         status_keyboardparityerror,
         status_timeout,
         ~(mouse_fifo_empty),
-        // Keyboard-inhibit (bit 4).  Held clear so the PC110 BIOS keyboard
-        // POST (gate F000:6477 tests this bit) is skipped instead of run:
-        // the test currently fails on spurious FIFO data and logs error
-        // 301, and any logged POST error blocks disk boot.  This is a
-        // temporary boot-enabler; the keyboard-device path still needs the
-        // spurious-data fix for full keyboard function.
-        1'b0, //keyboard inhibit (skip POST keyboard test)
+        1'b1, //keyboard inhibit (run the POST keyboard test)
         status_lastcommand,
         status_system,
         status_inputbufferfull,
@@ -236,7 +230,12 @@ reg status_mousebufferfull;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                                   status_mousebufferfull <= 1'b0;
     else if(io_read_valid && io_address[2:0] == 3'd0)   status_mousebufferfull <= 1'b0;
-    else if(outputbuffer_idle && ~(mouse_fifo_empty))   status_mousebufferfull <= 1'b1;
+    // Do not surface mouse data on the shared output buffer while the mouse
+    // is disabled (the BIOS sends 0xA7 before its keyboard POST).  Without
+    // this, spurious/streaming mouse-device bytes steal the port-60h reads
+    // of the keyboard flush, so the keyboard test never sees the keyboard
+    // and logs error 301 - which blocks disk boot.
+    else if(outputbuffer_idle && ~(mouse_fifo_empty) && ~disable_mouse) status_mousebufferfull <= 1'b1;
 end
 
 reg status_outputbufferfull;
