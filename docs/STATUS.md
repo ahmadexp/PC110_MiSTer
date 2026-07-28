@@ -84,11 +84,56 @@ writes, flag changes, and executed EIPs.  Findings from that harness:
   phase (BDA writes at `410h` onward) under every configuration tested:
   L1 on/off, with/without the prefetch fix, ideal and slow DDR
 
-On hardware the CPU halts before the first BDA write, with junk byte-writes
-visible in low DDR - behavior simulation does not reproduce.  The next
-diagnostic is a POST-code logger: latch chipset writes to `3BCh`, `190h`,
-and `191h` and stream them out the core's UART (`/dev/ttyS1` on the HPS) so
-the on-hardware failure point becomes directly observable.
+The POST-code logger grew into a full serial trace (UART `/dev/ttyS1` on the
+HPS at 115200): POST checkpoints (`190h`), progress (`3BCh`), the complete
+8042 conversation (commands, status, data), the ATA task file, CMOS reads,
+and an L2 snoop of the EBDA POST-error-log writes - all interleaved in
+stream order.  `scratchpad` tooling (`cap.sh` / `decode_plog.py` in the
+session workspace) reloads the core, captures a POST, and decodes it.
+
+## Boot milestone (2026-07-28)
+
+POST completes with **zero errors**, INT19 loads the boot sector from the
+Personaware disk image, and **PC DOS J7.0/V boots to a working `C:\PW>`
+prompt with a fully functional keyboard** (typed commands execute).
+
+The final blocker was keyboard POST error 301 - five stacked causes, found
+with the interleaved trace plus live-BIOS disassembly grounded at exact
+ROM offsets:
+
+1. keyboard identify must return the TRANSLATED ID `AB 41` (BIOS checks
+   `41h` at `F000:B068`), not raw `AB 83`
+2. the 8042's single shared output buffer: AUXOBF (status bit5) must be
+   `status_mousebufferfull` (respecting aux-disable), not raw mouse-FIFO
+   occupancy, or stale mouse data marks keyboard ACKs as mouse bytes
+3. the input buffer (IBF) must free as soon as a device command is
+   consumed; gating it on OBF made the BIOS's aux-disable command-byte
+   write (`65h`) silently drop, wedging the mouse into the shared buffer
+4. device FIFOs are cleared on each new device command so responses are
+   exactly aligned (`FFh` -> precisely `FA AA`); stray hps_io power-on BAT
+   bytes otherwise read as "keyboard jabber"
+5. the EARLY keyboard test (checkpoint `56h`, `F000:4FEF`) is skipped via
+   the BIOS's own gate (8042 status bit4 = inhibited, asserted only inside
+   the `56h`-`5Ah` checkpoint window): its pass path ends in a stuck-key
+   check that consults the system MCU through an SMI API (`AX=5380h`)
+   whose result returns in CPU registers rewritten by SMM - ao486 has no
+   SMM, so the check fails deterministically.  The MAIN keyboard test
+   (checkpoint `6Dh`) still runs with bit4=1 and passes.
+
+A local aux/mouse responder answers the pointing-device reset
+(`FF -> FA AA 00`, identify `F2 -> FA 00`); mouse POST messages are
+display-only and never gate boot.
+
+Known follow-ups:
+
+- PersonaWare's launcher reports "Error occurred in initializing DOS PM /
+  ERROR 5" and falls back to the DOS prompt - GUI init not yet diagnosed
+- the trackpad is not yet relayed to the HPS mouse (the serial relay held
+  IBF and broke POST; needs a copy-register relay that does not pin IBF)
+- one ARM-side Linux reboot was observed on the first load of the
+  boot-capable RBF (not reproduced on reload) - watch for recurrence
+- RAM-size OSD menu (4/8/12/20 MB) still to be added
+- current RBFs are FAST-fit debug builds; do a full-effort fit for release
 
 Hardware smoke tests should record:
 
@@ -96,4 +141,4 @@ Hardware smoke tests should record:
 - MiSTer Main version
 - `/tmp/CORENAME`
 - installed ROM sizes and hashes
-- on-screen POST code or failure point
+- serial POST trace (`cap.sh`), EBDA error count/code, and a screenshot
