@@ -59,6 +59,10 @@ module ps2
 	// the buffer holds set-1 codes (F1 make = 3Bh).
 	input                   inject_f1,
 
+	// while high, status bit4 reads 0 (keyboard inhibited): used to make
+	// the PC110 BIOS skip its EARLY keyboard test (see pc110_chipset.sv)
+	input                   hide_kbd,
+
 	//ps2 mouse
 	input                   ps2_mouseclk,
 	input                   ps2_mousedat,
@@ -100,7 +104,7 @@ wire [7:0] io_readdata_next =
         // keyboard command 6x, gives up, and logs 301.  status_mousebufferfull
         // respects disable_mouse, so it is 0 while the aux is disabled.
         status_mousebufferfull,
-        1'b1, //keyboard inhibit (run the POST keyboard test)
+        ~hide_kbd, //bit4: 1 = not inhibited; 0 during the early-POST window (test skipped)
         status_lastcommand,
         status_system,
         status_inputbufferfull,

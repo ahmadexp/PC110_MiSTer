@@ -232,6 +232,7 @@ assign      DDRAM_CLK = clk_sys;
 wire       pc110_errlog_wr;
 wire [7:0] pc110_errlog_tag;
 wire [7:0] pc110_errlog_byte;
+wire       pc110_kbd_hide;
 
 l2_cache cache
 (
@@ -424,7 +425,8 @@ pc110_chipset pc110
 	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8),
 	.errlog_wr           (pc110_errlog_wr),
 	.errlog_tag          (pc110_errlog_tag),
-	.errlog_byte         (pc110_errlog_byte)
+	.errlog_byte         (pc110_errlog_byte),
+	.kbd_hide            (pc110_kbd_hide)
 );
 
 iobus iobus
@@ -645,6 +647,7 @@ ps2 ps2
 	.ps2_kbclk_out     (ps2_kbclk_out),
 	.ps2_kbdat_out     (ps2_kbdat_out),
 	.inject_f1         (inject_f1),
+	.hide_kbd          (pc110_kbd_hide),
 
 	.ps2_mouseclk      (ps2_mouseclk_in),
 	.ps2_mousedat      (ps2_mousedat_in),

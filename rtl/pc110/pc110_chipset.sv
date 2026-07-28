@@ -50,7 +50,14 @@ module pc110_chipset
 	// logged appears in the serial trace.
 	input  logic        errlog_wr,
 	input  logic  [7:0] errlog_tag,
-	input  logic  [7:0] errlog_byte
+	input  logic  [7:0] errlog_byte,
+
+	// asserted while POST is inside its EARLY keyboard test (checkpoint
+	// 56h on port 190h); the 8042 reports the keyboard inhibited (status
+	// bit4 = 0) during this window so the test - whose pass path needs an
+	// SMM service ao486 cannot provide - is skipped.  See the checkpoint
+	// tracker below.
+	output logic        kbd_hide
 );
 
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
@@ -439,15 +446,30 @@ module pc110_chipset
 	logic  [8:0] plog_head, plog_tail;
 	logic        io_write_d;
 
+	// POST checkpoint tracking (port 190h).  The BIOS's EARLY keyboard test
+	// runs exactly between checkpoint 56h (F000:4FEC) and 5Ah (F000:4FF4).
+	// Its 6477h entry gate skips the whole test when 8042 status bit4 reads
+	// 0 (keyboard inhibited).  We assert kbd_hide during that window so the
+	// early test is skipped: its pass path ends in a stuck-key check that
+	// consults the system MCU through an SMI API (AX=5380h) - the result
+	// comes back in CPU registers rewritten by SMM, which ao486 does not
+	// implement, so the check would read the routine's own CL=ABh and log
+	// POST error 301 deterministically (nonzero error count -> I9990303 ->
+	// no disk boot).  The MAIN keyboard test (checkpoint 6Dh) runs with
+	// bit4=1 as before and fully passes, so the keyboard still works.
+	logic [7:0] ckpt_last;
+	assign kbd_hide = (ckpt_last == 8'h56);
+
 	always_ff @(posedge clk) begin
 		io_write_d <= io_write;
 		if(reset) begin
 			plog_tail <= 9'd0;
+			ckpt_last <= 8'h00;
 		end
 		else if(io_write && !io_write_d) begin
 			case(io_address)
 				16'h03BC: begin plog_fifo[plog_tail] <= {8'h50, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'P' progress
-				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'E' failure hi
+				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; ckpt_last <= io_writedata; end // 'E' failure hi
 				16'h0191: begin plog_fifo[plog_tail] <= {8'h65, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'e' failure lo
 				// video BIOS progress: C&T extension index writes ('X') mean
 				// the 32 KiB runtime image decompressed and init body started
