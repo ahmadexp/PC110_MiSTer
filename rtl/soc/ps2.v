@@ -91,7 +91,15 @@ wire [7:0] io_readdata_next =
     (io_read_valid && io_address[2:0] == 3'd4)? {
         status_keyboardparityerror,
         status_timeout,
-        ~(mouse_fifo_empty),
+        // AUXOBF (bit5): "the byte currently in the output buffer is from
+        // the aux/mouse".  That is status_mousebufferfull - the flag that
+        // actually routes port-60h reads to mouse data - NOT raw mouse-FIFO
+        // occupancy.  With ~mouse_fifo_empty here, a mouse reset response
+        // sitting in the (disabled) mouse FIFO pins AUXOBF=1, so the BIOS
+        // treats every keyboard ACK as mouse data, discards it, retries each
+        // keyboard command 6x, gives up, and logs 301.  status_mousebufferfull
+        // respects disable_mouse, so it is 0 while the aux is disabled.
+        status_mousebufferfull,
         1'b1, //keyboard inhibit (run the POST keyboard test)
         status_lastcommand,
         status_system,
