@@ -165,9 +165,21 @@ always @(posedge clk) begin
     else if(cmd_write_command_byte)     translate <= io_writedata[6];
 end
 
+// Power-on default: aux/mouse clock DISABLED (command-byte bit5 = 1).  The
+// real PC110 8042 powers up with the aux port disabled - its command byte
+// reads back ~0x21, and the BIOS OR-sets translate|sysflag to reach the
+// steady 0x65 it runs POST with (Open-Source-PC110/Discovery live BIOS).
+// This matters because the 8042 has ONE shared output buffer: if the aux
+// is enabled and the (hps_io) mouse streams a byte during the keyboard
+// POST, status_mousebufferfull sets, which both steals the port-60h read
+// (io_readdata mux) and blocks the keyboard OBF from re-asserting for the
+// identify's 2nd ID byte - so the BIOS reads the identify ACK, never sees
+// 0xAB, times out, and logs 301 (which blocks disk boot).  Defaulting the
+// aux disabled matches real hardware and keeps the mouse off the shared
+// buffer until software explicitly enables it (0xA8 / command byte).
 reg disable_mouse;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                   disable_mouse <= 1'b0;
+    if(rst_n == 1'b0)                   disable_mouse <= 1'b1;
     else if(cmd_write_command_byte)     disable_mouse <= io_writedata[5];
     else if(cmd_disable_mouse)          disable_mouse <= 1'b1;
     else if(cmd_enable_mouse)           disable_mouse <= 1'b0;
@@ -176,7 +188,7 @@ end
 
 reg disable_mouse_visible;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                   disable_mouse_visible <= 1'b0;
+    if(rst_n == 1'b0)                   disable_mouse_visible <= 1'b1;
     else if(cmd_write_command_byte)     disable_mouse_visible <= io_writedata[5];
     else if(cmd_disable_mouse)          disable_mouse_visible <= 1'b1;
     else if(cmd_enable_mouse)           disable_mouse_visible <= 1'b0;
@@ -200,7 +212,7 @@ end
 
 reg allow_irq_mouse;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                   allow_irq_mouse <= 1'b1;
+    if(rst_n == 1'b0)                   allow_irq_mouse <= 1'b0;  // IRQ12 masked at power-on (real 8042 default)
     else if(cmd_write_command_byte)     allow_irq_mouse <= io_writedata[1];
 end
 
