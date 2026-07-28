@@ -684,8 +684,14 @@ always @(posedge clk) begin
             kr_busy <= 1'b1;
             kr_pos  <= 2'd0;
             case(io_writedata)
-                8'hFF: begin kr_b1 <= 8'hAA; kr_b2 <= 8'h00; kr_len <= 2'd2; end // reset -> FA,AA(BAT)
-                8'hF2: begin kr_b1 <= 8'hAB; kr_b2 <= 8'h83; kr_len <= 2'd3; end // identify -> FA,AB,83
+                8'hFF: begin kr_b1 <= 8'hAA; kr_b2 <= 8'h00; kr_len <= 2'd2; end // reset -> FA,AA(BAT); pass-through, not translated
+                // identify -> FA,AB,41.  The MF2 keyboard's real 2nd ID byte
+                // is 83h, but 8042 scancode translation (which is enabled)
+                // maps 83h -> 41h, and the PC110 BIOS (F000:B068) checks for
+                // the TRANSLATED value 41h, not raw 83h.  Since this local
+                // response is injected past the translation stage, emit the
+                // already-translated 41h directly.
+                8'hF2: begin kr_b1 <= 8'hAB; kr_b2 <= 8'h41; kr_len <= 2'd3; end
                 default: begin kr_b1 <= 8'h00; kr_b2 <= 8'h00; kr_len <= 2'd1; end // ACK only
             endcase
         end
