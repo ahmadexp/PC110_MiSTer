@@ -396,7 +396,18 @@ reg status_inputbufferfull;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                                       status_inputbufferfull <= 1'b0;
     else if(write_to_keyb || write_to_mouse)                status_inputbufferfull <= 1'b1;
-    else if(input_write_done && status_outputbufferfull)    status_inputbufferfull <= 1'b0;
+    // IBF means "the host wrote a byte the 8042 has not consumed yet".  A
+    // real 8042 clears it as soon as its firmware reads the input register
+    // (microseconds), independent of whether an output byte is ready.  Our
+    // device commands are answered locally, so the byte is consumed
+    // immediately - clear IBF as soon as input_write_done, NOT gated on OBF.
+    // Gating on OBF held IBF set through the whole (slow) response, so the
+    // PC110 BIOS - which resets the mouse then writes command byte 0x65 to
+    // disable the aux - wrote 0x65 while IBF was still stuck, the
+    // command-byte write (cmd_with_param, gated on ~IBF) was dropped,
+    // disable_mouse never flipped, and the mouse kept jamming the keyboard
+    // POST -> 301 -> no boot.
+    else if(input_write_done)                               status_inputbufferfull <= 1'b0;
 end
 
 reg input_write_done;
@@ -410,7 +421,16 @@ always @(posedge clk) begin
     // and the two interleaved response streams misalign the BIOS keyboard
     // POST and keep error 301 logged (which blocks disk boot).
     else if(write_to_keyb)                              input_write_done <= 1'b1;
-    else if(write_to_mouse)                             input_write_done <= 1'b0;
+    // Mark mouse device writes done immediately too (was 1'b0 = relay to the
+    // HPS mouse).  The PC110 BIOS resets the mouse mid keyboard-POST; the
+    // slow serial relay held IBF/input-buffer state long enough that the
+    // BIOS's following command-byte write (0x65, aux-disable) was dropped,
+    // wedging the keyboard POST at error 301.  Consuming the byte locally
+    // frees the input buffer at once so the aux-disable lands and the
+    // keyboard POST completes.  (Trade-off: the trackpad is not relayed for
+    // now; the keyboard - and disk boot - take priority.  A proper mouse
+    // path needs a copy register so the relay can run without pinning IBF.)
+    else if(write_to_mouse)                             input_write_done <= 1'b1;
     else if(ps2_kb_write_done || ps2_mouse_write_done)  input_write_done <= 1'b1;
 end
 
