@@ -222,11 +222,21 @@ wire pc110_upper_rgn =
 // PC110-EMU, which runs this BIOS, likewise backs C0000-FFFFF with plain
 // writable RAM.  PC110_SHADOW_WE is kept wired for future separation of
 // the flash image from shadow RAM (see docs/STATUS.md debt item 1).
-wire rom_rgn = 1'b0;
+// Full upper-address compare: with only [17:11] compared the window
+// aliased every 1 MiB, so extended-memory accesses at 1DE000h, 2DE000h,
+// ... silently hit the font window instead of RAM.
+wire pc110_font_rgn = PC110_FONT_EN &&
+	(CPU_ADDR[29:11] == {12'h000, PC110_FONT_SEG[7:1]});
+// The banked font window must be write-IGNORE like the real font ROM:
+// $FONT.SYS's hardware probe (file offset 6618h) writes 55AAh over the
+// AA55h signature and requires the readback to be UNCHANGED before it
+// will register the hardware font sets.  With the window writable, that
+// probe fails, no DBCS fonts register (the disk carries no $JPN*.FNT
+// fallback), $DISP.SYS's INT15 AX=5000h font query gets AH=86h, V-text
+// never installs, and Japanese text renders as garbage.
+wire rom_rgn = pc110_font_rgn;
 wire vga_rgn = (CPU_ADDR[ADDRBITS+1:15] == 'h5)  && ((CPU_ADDR[14:13] & vga_mask) == vga_cmp);
 wire shr_rgn = (CPU_ADDR[ADDRBITS+1:11] == 'h67) && shr_rgn_en;
-wire pc110_font_rgn = PC110_FONT_EN &&
-	(CPU_ADDR[17:11] == PC110_FONT_SEG[7:1]);
 wire [ADDRBITS:0] pc110_font_addr =
 	25'h0400000 + {8'h00, PC110_FONT_BANK, 10'h000} + CPU_ADDR[10:1];
 // 20 MiB installed: 4 MiB planar RAM plus the 16 MiB expansion card.

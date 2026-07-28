@@ -40,6 +40,9 @@ module rtc(
 	input             memcfg,
 	input       [5:0] bootcfg,
 
+	// force CMOS 7Bh bit3 (enter setup on this boot) while held
+	input             setup_req,
+
 	//mgmt slave
 	/*
 	128.[26:0]: cycles in second
@@ -125,6 +128,13 @@ wire [7:0] io_readdata_next =
     (ram_address == 7'h3F) ? 8'h00 :
     (ram_address == 7'h32) ? rtc_century :
     (ram_address == 7'h37) ? rtc_century :
+    // CMOS 7Bh bit3 = "enter setup on this boot".  The INT19 boot decision
+    // (F000:8143) tests it right before its F1 check; the F1 check itself
+    // reads the system MCU through an SMI service ao486 cannot provide, so
+    // this bit is the only workable Easy-Setup entry.  setup_req is held by
+    // the OSD "Enter BIOS Setup" action (and by a real F1 press during
+    // POST) and expires on its own.
+    (ram_address == 7'h7B) ? (ram_q | (setup_req ? 8'h08 : 8'h00)) :
                              ram_q;
 
 always @(posedge clk) io_readdata <= io_readdata_next;

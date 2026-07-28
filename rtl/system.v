@@ -29,6 +29,7 @@ module system
 	input         ps2_kbclk_in,
 	input         ps2_kbdat_in,
 	input         inject_f1,
+	input         bios_setup_req,
 	output        ps2_kbclk_out,
 	output        ps2_kbdat_out,
 	input         ps2_mouseclk_in,
@@ -681,6 +682,7 @@ rtc rtc
 
 	.memcfg            (memcfg),
 	.bootcfg           ({bootcfg[5:2], bootcfg[1:0] ? bootcfg[1:0] : {~fdd0_inserted, fdd0_inserted}}),
+	.setup_req         (bios_setup_req),
 
 	.irq               (irq_8)
 );

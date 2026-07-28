@@ -769,6 +769,7 @@ system system
 	.ps2_kbclk_out        (ps2_kbd_clk_in),
 	.ps2_kbdat_out        (ps2_kbd_data_in),
 	.inject_f1            (inject_f1),
+	.bios_setup_req       (bios_setup_req),
 
 	.ps2_mouseclk_in      (ps2_mouse_clk_out),
 	.ps2_mousedat_in      (ps2_mouse_data_out),
@@ -837,35 +838,50 @@ reg memcfg = 1;
 always @(posedge clk_sys) if(reset) memcfg <= 1;
 
 // "Enter BIOS Setup" (status[41]) and "Reset" (status[42]) menu actions.
-// Both pulse the core reset; Enter BIOS additionally holds inject_f1 for a
-// few seconds so POST sees F1 and opens IBM Easy-Setup.  clk_sys is
-// 90 MHz, so the 28-bit counters span roughly 1.5 s (reset) and 3 s (F1).
-reg        inject_f1;
+// Both pulse the core reset.  Easy-Setup entry does NOT work by injecting
+// an F1 scancode: the BIOS's setup gate (F000:8150 -> DF51) reads the
+// "currently held key" from the PC110 system MCU through an SMI service
+// that ao486 cannot provide - it never consults the 8042/INT16 path.  The
+// same INT19 decision tests CMOS 7Bh bit3 first (F000:8143), so Enter
+// BIOS instead holds bios_setup_req, which forces that bit while POST
+// runs; INT19 then routes into the setup/config path with no keystroke.
+// A real F1 press seen on ps2_key during POST arms the same request, so
+// holding F1 works like on the real machine.  clk_sys is 90 MHz: the
+// 28-bit reset counter spans ~3 s, the 33-bit setup window ~95 s (POST
+// takes ~30-60 s to reach INT19; the window comfortably covers it and
+// then expires so later boots are normal).
+reg        inject_f1;      // retired: setup entry cannot work via scancode
+reg        bios_setup_req;
 always @(posedge clk_sys) begin
 	reg        old_bios = 0, old_rst2 = 0;
 	reg [27:0] bios_rst_cnt = 0;
-	reg [28:0] bios_f1_cnt  = 0;
+	reg [32:0] setup_cnt    = 0;
 	reg [27:0] mrst_cnt     = 0;
+	reg        old_f1stb = 0;
 
 	old_bios <= status[41];
 	old_rst2 <= status[42];
 
+	// real F1 make (set-2 code 05h) during POST arms setup entry too
+	old_f1stb <= ps2_key[10];
+	if((old_f1stb ^ ps2_key[10]) && ps2_key[7:0] == 8'h05 && ps2_key[9])
+		setup_cnt <= 33'h1FFFFFFFF;
+
 	if(status[41] & ~old_bios) begin
 		bios_rst_cnt <= 28'hFFFFFFF;
-		bios_f1_cnt  <= 29'h1FFFFFFF;
+		setup_cnt    <= 33'h1FFFFFFFF;
 	end
 	else begin
 		if(bios_rst_cnt) bios_rst_cnt <= bios_rst_cnt - 1'b1;
-		if(bios_f1_cnt)  bios_f1_cnt  <= bios_f1_cnt  - 1'b1;
+		if(setup_cnt)    setup_cnt    <= setup_cnt    - 1'b1;
 	end
 
 	if(status[42] & ~old_rst2) mrst_cnt <= 28'hFFFFFFF;
 	else if(mrst_cnt)          mrst_cnt <= mrst_cnt - 1'b1;
 
-	// hold F1 injection only after the enter-BIOS reset window ends, so it
-	// lands during POST rather than while the CPU is held in reset
-	inject_f1 <= |bios_f1_cnt & ~|bios_rst_cnt;
-	menu_reset <= |bios_rst_cnt | |mrst_cnt;
+	inject_f1      <= 1'b0;
+	bios_setup_req <= |setup_cnt;
+	menu_reset     <= |bios_rst_cnt | |mrst_cnt;
 end
 
 reg menu_reset;
