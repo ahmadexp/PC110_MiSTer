@@ -508,11 +508,13 @@ always @* begin
         8'h14: pc110_mgmt_data = 8'h25; // PC110 equipment byte
         8'h19: pc110_mgmt_data = 8'h7F; // drive 0 extended type (live capture)
         8'h1A: pc110_mgmt_data = 8'h7F; // drive 1 extended type (live capture)
-        // Boot-order nibbles (BIOS logical 9Dh/9Eh).  Nibble 8 selects the
-        // internal fixed disk (device 0080h); without it the BIOS builds a
-        // floppy-only boot list and never issues INT13 AH=02 for the HDD,
-        // halting at I9990303.  8h = HDD first, then floppy (0h).
-        8'h1D: pc110_mgmt_data = 8'h08;
+        // Boot-order nibbles (BIOS logical 9Dh/9Eh).  The builder at
+        // F000:887F does ror al,4 before extracting each device nibble, so
+        // the FIRST boot device is the HIGH nibble of 1Dh.  Nibble 8 =
+        // internal fixed disk (device 0080h); 80h -> HDD first, then floppy
+        // (low nibble 0).  Without the HDD nibble the BIOS never issues
+        // INT13 AH=02 for the disk and halts at I9990303.
+        8'h1D: pc110_mgmt_data = 8'h80;
         8'h1E: pc110_mgmt_data = 8'h00;
         8'h15: pc110_mgmt_data = 8'h80; // 640 KiB base memory
         8'h16: pc110_mgmt_data = 8'h02;
