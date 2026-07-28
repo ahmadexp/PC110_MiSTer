@@ -101,12 +101,14 @@ end
 reg [7:0] error;
 always @(posedge clk) begin
 	if(~rst_n)                               error <= 8'h00;
+	else if(sw_reset_done)                   error <= 8'h01;
 	else if(mgmt_write && mgmt_address == 0) error <= mgmt_writedata[15:8];
 end
 
 reg [15:0] sector_count;
 always @(posedge clk) begin
 	if(~rst_n)                               sector_count       <= 16'd1;
+	else if(sw_reset_done)                   sector_count       <= 16'd1;
 	else if(mgmt_write && mgmt_address == 1) sector_count[7:0]  <= mgmt_writedata[7:0];
 	else if(mgmt_write && mgmt_address == 3) sector_count[15:8] <= mgmt_writedata[7:0];
 	else if(io_wr && io_address == 2)        sector_count       <= {sector_count[7:0], io_writedata[7:0]};
@@ -115,6 +117,7 @@ end
 reg [15:0] sector;
 always @(posedge clk) begin
 	if(~rst_n)                               sector       <= 16'd1;
+	else if(sw_reset_done)                   sector       <= 16'd1;
 	else if(mgmt_write && mgmt_address == 1) sector[7:0]  <= mgmt_writedata[15:8];
 	else if(mgmt_write && mgmt_address == 3) sector[15:8] <= mgmt_writedata[15:8];
 	else if(io_wr && io_address == 3)        sector       <= {sector[7:0],io_writedata[7:0]};
@@ -123,6 +126,7 @@ end
 reg [31:0] cylinder;
 always @(posedge clk) begin
 	if(~rst_n)                               cylinder                          <= 32'hFFFFFFFF;
+	else if(sw_reset_done)                   cylinder                          <= 32'd0;
 	else if(mgmt_write && mgmt_address == 2) cylinder[15:0]                    <= mgmt_writedata[15:0];
 	else if(mgmt_write && mgmt_address == 4) cylinder[31:16]                   <= mgmt_writedata[15:0];
 	else if(io_wr && io_address == 4)        {cylinder[23:16], cylinder[7:0] } <= {cylinder[7:0],  io_writedata[7:0]};
@@ -132,6 +136,7 @@ end
 reg [7:0] drv_addr;
 always @(posedge clk) begin
 	if(~rst_n)                               drv_addr <= 8'd0;
+	else if(sw_reset_done)                   drv_addr <= 8'hA0;
 	else if(mgmt_write && mgmt_address == 5) drv_addr <= mgmt_writedata[7:0];
 	else if(io_wr && io_address == 6)        drv_addr <= io_writedata[7:0];
 end
@@ -145,6 +150,7 @@ end
 reg [7:0] status = 0;
 always @(posedge clk) begin
 	if(reset)                                status <= 8'h80;
+	else if(sw_reset_done)                   status <= 8'h40;
 	else if(mgmt_write && mgmt_address == 5) status <= {mgmt_writedata[15:14],1'b0,mgmt_writedata[12:11],2'b00,mgmt_writedata[8]};
 	else if(io_wr && io_address == 7)        status <= 8'h80;
 	else if(io_done & drq & last_read)       status <= 8'h40;
@@ -227,6 +233,15 @@ always @(posedge clk) begin
 	if(~rst_n)                         sw_reset <= 1'b0;
 	else if(io_wr && io_address == 14) sw_reset <= io_writedata[2];
 end
+
+// A soft reset must complete at hardware speed: the PC110 BIOS's drive
+// detect polls status only for tens of microseconds after releasing
+// SRST, far less than the HPS service round trip.  Present DRDY and the
+// ATA signature immediately on the release edge; Main's later "reset
+// finish" write reasserts the same ready state.
+reg sw_reset_d;
+always @(posedge clk) sw_reset_d <= sw_reset;
+wire sw_reset_done = sw_reset_d & ~sw_reset & present;
 
 reg hob_pre;
 always @(posedge clk) begin
