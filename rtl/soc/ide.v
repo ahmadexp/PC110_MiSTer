@@ -182,10 +182,16 @@ always @(posedge clk) begin
 	else if(io_done & drq)                   io_wait <= use_wait;
 end
 
+// Only a hard reset requests a full HPS re-service.  An ATA soft reset
+// (3F6h bit 2) must NOT: the PC110 BIOS drive-detect issues SRST and then
+// immediately polls status, but an HPS reset round trip parks BSY for
+// ~1 ms, so the BIOS reads 0x80 during its detect window and concludes no
+// drive.  sw_reset still resets the local task file, and sw_reset_done
+// presents the ready ATA signature at hardware speed.
 always @(posedge clk) begin
-	if(reset)                                request <= 3'b110; // reset
+	if(~rst_n)                               request <= 3'b110; // reset
 	else if(mgmt_write && mgmt_address == 5) request <= 3'b000;
-	else if(io_wr && io_address == 7)        request <= 3'b100; // new command 
+	else if(io_wr && io_address == 7)        request <= 3'b100; // new command
 	else if(io_done & drq & ~last_read)      request <= 3'b101; // data send/recv
 end
 
