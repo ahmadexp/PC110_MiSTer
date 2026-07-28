@@ -758,6 +758,54 @@ always @(posedge clk) begin
     end
 end
 
+// Local mouse (aux) responder, mirroring the keyboard responder above.  The
+// PC110 BIOS resets the pointing device (0xD4,0xFF) during POST; if it gets
+// no standard PS/2 mouse reply it retries the reset and then logs a
+// pointing-device POST error -> nonzero error count -> I9990303 halt -> no
+// boot.  Answer locally: reset 0xFF -> FA,AA,00 (ACK,BAT,device-id 0);
+// identify 0xF2 -> FA,00 (ACK, standard mouse id); everything else -> FA.
+// The replies go into the mouse FIFO; the BIOS reads them while the aux is
+// enabled (device present), and once it disables the aux (command byte
+// 0x65) the disable_mouse path drops mouse data from the shared output
+// buffer so it cannot jam the keyboard POST.
+reg        minj_wr;
+reg  [7:0] minj_data;
+reg        wtm_d;
+reg        mr_busy;
+reg  [1:0] mr_pos;
+reg  [1:0] mr_len;
+reg  [7:0] mr_b1, mr_b2;
+
+always @(posedge clk) begin
+    minj_wr <= 1'b0;
+    wtm_d   <= write_to_mouse;
+
+    if(rst_n == 1'b0) begin
+        mr_busy <= 1'b0;
+    end
+    else begin
+        if(write_to_mouse && !wtm_d) begin
+            mr_busy <= 1'b1;
+            mr_pos  <= 2'd0;
+            case(io_writedata)
+                8'hFF: begin mr_b1 <= 8'hAA; mr_b2 <= 8'h00; mr_len <= 2'd3; end // reset -> FA,AA,00
+                8'hF2: begin mr_b1 <= 8'h00; mr_b2 <= 8'h00; mr_len <= 2'd2; end // identify -> FA,00
+                default: begin mr_b1 <= 8'h00; mr_b2 <= 8'h00; mr_len <= 2'd1; end // ACK only
+            endcase
+        end
+        else if(mr_busy && !minj_wr) begin
+            minj_wr <= 1'b1;
+            case(mr_pos)
+                2'd0:    minj_data <= 8'hFA;
+                2'd1:    minj_data <= mr_b1;
+                default: minj_data <= mr_b2;
+            endcase
+            mr_pos <= mr_pos + 2'd1;
+            if(mr_pos + 2'd1 >= mr_len) mr_busy <= 1'b0;
+        end
+    end
+end
+
 simple_fifo #(
     .width      (8),
     .widthu     (6)
@@ -962,8 +1010,8 @@ mouse_fifo(
     
     .sclr       (cmd_self_test),                                                //input
     
-    .wrreq      (ps2_mouse_reply_done || mouse_recv_final),                     //input
-    .data       ((ps2_mouse_reply_done)? mouse_reply : mouse_recv_buffer),      //input [7:0]
+    .wrreq      (minj_wr || ps2_mouse_reply_done || mouse_recv_final),          //input
+    .data       (minj_wr ? minj_data : (ps2_mouse_reply_done)? mouse_reply : mouse_recv_buffer),  //input [7:0]
     .full       (mouse_fifo_full),                                              //output
     .usedw      (mouse_fifo_usedw),                                             //output [5:0]
     
