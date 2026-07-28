@@ -64,8 +64,17 @@ wire io_wr = io_write & |present;
 
 //------------------------------------------------------------------------------
 
+// A device only responds for the drive currently selected by 1F6h bit 4.
+// When the selected drive is absent, real hardware floats the bus and the
+// status register reads 0x00 (no DRDY), which is how the BIOS recognizes a
+// one-drive machine.  Our shared status register would otherwise report
+// the master's DRDY for the absent slave, so the BIOS treats the slave as
+// present-but-failing and aborts the boot with a configuration error.
+wire sel_present = present[drv_addr[4]];
+
 always @(posedge clk) if(io_read) begin
 	if(!present) io_readdata <= 32'hFFFFFFFF;
+	else if(!sel_present && io_address != 6) io_readdata <= 32'h00000000;
 	else begin
 		case(io_address)
 				   0: io_readdata <= status[3] ? {buf_q[31:16], (~io_32 & io_cnt[0]) ? buf_q[31:16] : buf_q[15:0]} : 32'd0;
