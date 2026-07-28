@@ -477,6 +477,12 @@ module pc110_chipset
 			plog_fifo[plog_tail] <= {8'h73, io_address[3:0], io_snoop[3:0]};
 			plog_tail <= plog_tail + 1'd1;
 		end
+		// keyboard data port 60h reads (tag 'K'): shows the scancodes the
+		// guest receives from the 8042, proving keystrokes reach the core
+		else if(io_read_d && !io_read && io_address == 16'h0060) begin
+			plog_fifo[plog_tail] <= {8'h4B, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
 	end
 
 	logic [9:0]  plog_div;
