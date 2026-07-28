@@ -368,7 +368,15 @@ end
 reg input_write_done;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                                   input_write_done <= 1'b0;
-    else if(write_to_keyb || write_to_mouse)            input_write_done <= 1'b0;
+    // Keyboard device commands are answered locally (see the responder
+    // below), so mark the write done immediately: this both clears the
+    // input-buffer-full flag and, because the keyboard send FSM starts
+    // only while ~input_write_done, suppresses the emulated PS/2 serial
+    // relay to the HPS keyboard.  Otherwise the HPS keyboard ALSO replies,
+    // and the two interleaved response streams misalign the BIOS keyboard
+    // POST and keep error 301 logged (which blocks disk boot).
+    else if(write_to_keyb)                              input_write_done <= 1'b1;
+    else if(write_to_mouse)                             input_write_done <= 1'b0;
     else if(ps2_kb_write_done || ps2_mouse_write_done)  input_write_done <= 1'b1;
 end
 
