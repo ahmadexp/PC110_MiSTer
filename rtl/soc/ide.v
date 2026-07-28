@@ -75,8 +75,11 @@ always @(posedge clk) if(io_read) begin
 				   4: io_readdata <= (hob ? cylinder[23:16]    : cylinder[7:0]     );
 				   5: io_readdata <= (hob ? cylinder[31:24]    : cylinder[15:8]    );
 				   6: io_readdata <= drv_addr;
-				   7: io_readdata <= status;
-				  14: io_readdata <= status;
+				   // Present DSC (seek complete) alongside DRDY: the PC110
+				   // BIOS drive detect requires idle status 50h as on real
+				   // hardware (live capture), not bare 40h.
+				   7: io_readdata <= status | ((status[6] & ~status[7]) ? 8'h10 : 8'h00);
+				  14: io_readdata <= status | ((status[6] & ~status[7]) ? 8'h10 : 8'h00);
 				  15: io_readdata <= { 2'b10, ~drv_addr[3:0], ~drv_addr[4], drv_addr[4]};
 			default: io_readdata <= 0;
 		endcase
