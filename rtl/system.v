@@ -229,12 +229,20 @@ wire  [5:0] video_rd_seg;
 
 assign      DDRAM_CLK = clk_sys;
 
+wire       pc110_errlog_wr;
+wire [7:0] pc110_errlog_tag;
+wire [7:0] pc110_errlog_byte;
+
 l2_cache cache
 (
 	.CLK               (clk_sys),
 	.RESET             (reset),
 
 	.DISABLE           (l2_disable),
+
+	.PC110_ERRLOG_WR   (pc110_errlog_wr),
+	.PC110_ERRLOG_TAG  (pc110_errlog_tag),
+	.PC110_ERRLOG_BYTE (pc110_errlog_byte),
 
 	.CPU_ADDR          (mem_address),
 	.CPU_DIN           (mem_writedata),
@@ -413,7 +421,10 @@ pc110_chipset pc110
 	.font_window_enable  (pc110_font_enable),
 	.dram_cfg0           (pc110_dram_cfg0),
 	.postlog_tx          (pc110_postlog_tx),
-	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8)
+	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8),
+	.errlog_wr           (pc110_errlog_wr),
+	.errlog_tag          (pc110_errlog_tag),
+	.errlog_byte         (pc110_errlog_byte)
 );
 
 iobus iobus

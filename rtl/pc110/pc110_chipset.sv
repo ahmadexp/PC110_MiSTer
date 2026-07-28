@@ -42,7 +42,15 @@ module pc110_chipset
 	output logic        postlog_tx,
 
 	// value returned on the shared I/O read bus, for the ATA trace
-	input  logic  [7:0] io_snoop
+	input  logic  [7:0] io_snoop,
+
+	// EBDA POST-error-log write snoop from the L2 cache: pulses with a
+	// preformed {tag, byte} pair ('J' = error count written, 'j' = first
+	// logged code word's low byte) so the exact instant an error is
+	// logged appears in the serial trace.
+	input  logic        errlog_wr,
+	input  logic  [7:0] errlog_tag,
+	input  logic  [7:0] errlog_byte
 );
 
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
@@ -409,6 +417,7 @@ module pc110_chipset
 	logic [7:0] ata_status_reads;
 	logic [7:0] ata_last_status = 8'hDE;
 	logic [7:0] ata_last_err = 8'hDE;
+	logic [7:0] kbc_last_status = 8'hDE;   // diagnostic: 8042 status (64h) last value
 	logic [6:0] cmos_sel;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
@@ -458,6 +467,12 @@ module pc110_chipset
 					plog_fifo[plog_tail] <= {{2'b10, eced_index}, io_writedata};
 					plog_tail <= plog_tail + 1'd1;
 				end
+				// 8042 keyboard conversation (diagnostic): keyboard-device
+				// command writes to 60h (tag 'W'=57h) and controller command
+				// writes to 64h (tag 'M'=4Dh), so the BIOS's exact 8042
+				// command stream is visible alongside the 60h read stream.
+				16'h0060: begin plog_fifo[plog_tail] <= {8'h57, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				16'h0064: begin plog_fifo[plog_tail] <= {8'h4D, io_writedata}; plog_tail <= plog_tail + 1'd1; end
 				default: ;
 			endcase
 		end
@@ -496,12 +511,27 @@ module pc110_chipset
 			plog_fifo[plog_tail] <= {8'h4B, io_snoop};
 			plog_tail <= plog_tail + 1'd1;
 		end
+		// 8042 status port 64h reads (tag 'S'), logged when the value
+		// changes: reconstructs the OBF/AUXOBF/IBF sequence the BIOS polls,
+		// so we can see whether OBF re-asserts for the identify's 2nd byte.
+		else if(io_read_d && !io_read && io_address == 16'h0064 &&
+		        io_snoop != kbc_last_status) begin
+			kbc_last_status <= io_snoop;
+			plog_fifo[plog_tail] <= {8'h53, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
 		// CMOS reads (port 71h) of the boot-order/diagnostic bytes: tag
 		// 'C'=0Eh diag, 'c'=1Dh order-lo, 'i'=1Eh order-hi, so we can see
 		// exactly what the INT19 boot-list builder reads
 		else if(io_read_d && !io_read && io_address == 16'h0071 &&
 		        (cmos_sel == 7'h0E || cmos_sel == 7'h1D || cmos_sel == 7'h1E)) begin
 			plog_fifo[plog_tail] <= {(cmos_sel==7'h0E)?8'h43:(cmos_sel==7'h1D)?8'h63:8'h69, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		// EBDA POST-error-log writes (from the L2 snoop): the moment an
+		// error is recorded, in stream order with checkpoints and I/O
+		else if(errlog_wr) begin
+			plog_fifo[plog_tail] <= {errlog_tag, errlog_byte};
 			plog_tail <= plog_tail + 1'd1;
 		end
 	end

@@ -56,7 +56,15 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// not match the planar array (0Bh), accesses inside the 4 MiB planar
 	// bank fold their row bits so a write at +400h reads back at the base
 	// address, and the expansion region does not respond.
-	input   [7:0] PC110_DRAM_CFG0
+	input   [7:0] PC110_DRAM_CFG0,
+
+	// PC110 debug: pulse when POST writes its error log in the EBDA
+	// (count byte at phys 9FC17h, first code word at 9FC18h).  Fed to the
+	// chipset post-logger so the exact moment an error is logged is
+	// visible in the serial trace, interleaved with checkpoints and I/O.
+	output reg        PC110_ERRLOG_WR,
+	output reg  [7:0] PC110_ERRLOG_TAG,
+	output reg  [7:0] PC110_ERRLOG_BYTE
 );
    
 
@@ -688,5 +696,28 @@ generate
 		);
 	end
 endgenerate 
+
+// PC110 debug: EBDA error-log write snoop.  CPU_ADDR/cpu_addr_m are 32-bit
+// -word addresses, so the EBDA error count byte (phys 9FC17h, EBDA:0x17
+// with the EBDA at segment 9FC0h) is dword 27F05h byte lane 3, and the
+// first logged code word (phys 9FC18h) is dword 27F06h lanes 0-1.  A write
+// is accepted exactly when the state machine leaves IDLE with it, so gate
+// on that cycle for a one-shot per write.  Tags: 'J' (4Ah) = count byte
+// written (value = new count), 'j' (6Ah) = code word low byte.
+always @(posedge CLK) begin
+	PC110_ERRLOG_WR <= 1'b0;
+	if (state == IDLE && !DDRAM_BUSY && CPU_WE) begin
+		if (cpu_addr_m == 30'h27F05 && CPU_BE[3]) begin
+			PC110_ERRLOG_WR   <= 1'b1;
+			PC110_ERRLOG_TAG  <= 8'h4A;
+			PC110_ERRLOG_BYTE <= CPU_DIN[31:24];
+		end
+		else if (cpu_addr_m == 30'h27F06 && CPU_BE[0]) begin
+			PC110_ERRLOG_WR   <= 1'b1;
+			PC110_ERRLOG_TAG  <= 8'h6A;
+			PC110_ERRLOG_BYTE <= CPU_DIN[7:0];
+		end
+	end
+end
 
 endmodule
