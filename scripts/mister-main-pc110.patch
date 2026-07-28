@@ -1,3 +1,32 @@
+diff --git a/ide.cpp b/ide.cpp
+index 1452a5f..14e92f1 100644
+--- a/ide.cpp
++++ b/ide.cpp
+@@ -1106,6 +1106,24 @@ int ide_open(uint8_t unit, const char* filename)
+ 		{
+ 			printf("file: \"%s\": ", hdd_file[unit].name);
+ 			guess_geometry(&hdd_file[unit], &chs, is_minimig() && !strcasecmp(".hdf", filename + strlen(filename) - 4));
++
++			// The PC110 internal flash / PCMCIA ATA disks report a real
++			// SunDisk-style geometry of 2 heads x 32 sectors.  The generic
++			// guess (4 heads x 63 sectors) makes the PC110 BIOS apply an
++			// LBA-assist translation to 16 heads x 256 sectors; 256 wraps to
++			// 0 in the 8-bit INIT DEVICE PARAMETERS register, producing a
++			// degenerate CHS that the BIOS's own range check (F000:DA7E,
++			// error 9) rejects - so the drive is initialized but never
++			// counted or booted.  Force the native geometry instead.
++			if (!strcasecmp(user_io_get_core_name(), "PC110") && hdd_file[unit].size)
++			{
++				chs.heads = 2;
++				chs.sectors = 32;
++				chs.cylinders = hdd_file[unit].size / (2 * 32 * 512);
++				if (chs.cylinders > 65535) chs.cylinders = 65535;
++				chs.offset = 0;
++			}
++
+ 			printf("size: %llu (%llu MB)\n", hdd_file[unit].size, hdd_file[unit].size >> 20);
+ 			printf("CHS: %u/%u/%u", chs.cylinders, chs.heads, chs.sectors);
+ 			printf(" (%llu MB), ", ((((uint64_t)chs.cylinders) * chs.heads * chs.sectors) >> 11));
 diff --git a/scaler.cpp b/scaler.cpp
 index 96e7851..462625e 100644
 --- a/scaler.cpp
