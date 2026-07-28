@@ -401,6 +401,7 @@ module pc110_chipset
 	logic io_read_d;
 	logic [7:0] ata_status_reads;
 	logic [7:0] ata_last_status = 8'hDE;
+	logic [7:0] ata_last_err = 8'hDE;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
 		if(reset) vstat_flip <= 1'b0;
@@ -459,6 +460,21 @@ module pc110_chipset
 		else if(io_read && !io_read_d && io_address == 16'h01F7 &&
 		        ata_status_reads[3:0] == 4'hF) begin
 			plog_fifo[plog_tail] <= {8'h72, ata_status_reads};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		// error register (1F1h) reads (tag 'x'): the reset-signature detect
+		// at F000:D1E0 requires 01h here; log its value when it changes
+		else if(io_read_d && !io_read && io_address == 16'h01F1 &&
+		        io_snoop != ata_last_err) begin
+			ata_last_err <= io_snoop;
+			plog_fifo[plog_tail] <= {8'h78, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		// signature register reads after reset (1F2 count, 1F4/1F5 cyl):
+		// tag 's' with {addr[2:0], value nibble} so CHS signature is visible
+		else if(io_read_d && !io_read &&
+		        (io_address == 16'h01F2 || io_address == 16'h01F4 || io_address == 16'h01F5)) begin
+			plog_fifo[plog_tail] <= {8'h73, io_address[3:0], io_snoop[3:0]};
 			plog_tail <= plog_tail + 1'd1;
 		end
 	end
