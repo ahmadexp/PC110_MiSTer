@@ -402,6 +402,7 @@ module pc110_chipset
 	logic [7:0] ata_status_reads;
 	logic [7:0] ata_last_status = 8'hDE;
 	logic [7:0] ata_last_err = 8'hDE;
+	logic [6:0] cmos_sel;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
 		if(reset) vstat_flip <= 1'b0;
@@ -411,6 +412,11 @@ module pc110_chipset
 		if(reset) ata_status_reads <= 8'd0;
 		else if(io_read && !io_read_d && io_address == 16'h01F7)
 			ata_status_reads <= ata_status_reads + 1'd1;
+		// track the CMOS/RTC index the guest last selected via port 70h,
+		// so 71h reads can be attributed to a specific CMOS byte
+		if(reset) cmos_sel <= 7'd0;
+		else if(io_write && !io_write_d && io_address == 16'h0070)
+			cmos_sel <= io_writedata[6:0];
 	end
 
 	logic [15:0] plog_fifo [0:511];
@@ -481,6 +487,14 @@ module pc110_chipset
 		// guest receives from the 8042, proving keystrokes reach the core
 		else if(io_read_d && !io_read && io_address == 16'h0060) begin
 			plog_fifo[plog_tail] <= {8'h4B, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		// CMOS reads (port 71h) of the boot-order/diagnostic bytes: tag
+		// 'C'=0Eh diag, 'c'=1Dh order-lo, 'i'=1Eh order-hi, so we can see
+		// exactly what the INT19 boot-list builder reads
+		else if(io_read_d && !io_read && io_address == 16'h0071 &&
+		        (cmos_sel == 7'h0E || cmos_sel == 7'h1D || cmos_sel == 7'h1E)) begin
+			plog_fifo[plog_tail] <= {(cmos_sel==7'h0E)?8'h43:(cmos_sel==7'h1D)?8'h63:8'h69, io_snoop};
 			plog_tail <= plog_tail + 1'd1;
 		end
 	end
