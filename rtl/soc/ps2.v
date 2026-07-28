@@ -711,10 +711,12 @@ reg        kr_busy;
 reg  [1:0] kr_pos;
 reg  [1:0] kr_len;
 reg  [7:0] kr_b1, kr_b2;
+reg        kclr;    // clear keyb FIFO on a new device command (see below)
 
 always @(posedge clk) begin
     inj_wr <= 1'b0;
     wtk_d  <= write_to_keyb;
+    kclr   <= write_to_keyb && !wtk_d;
 
     if(rst_n == 1'b0) begin
         inj_ctr <= 22'd0;
@@ -775,10 +777,12 @@ reg        mr_busy;
 reg  [1:0] mr_pos;
 reg  [1:0] mr_len;
 reg  [7:0] mr_b1, mr_b2;
+reg        mclr;    // clear mouse FIFO on a new device command (same rationale as kclr)
 
 always @(posedge clk) begin
     minj_wr <= 1'b0;
     wtm_d   <= write_to_mouse;
+    mclr    <= write_to_mouse && !wtm_d;
 
     if(rst_n == 1'b0) begin
         mr_busy <= 1'b0;
@@ -814,7 +818,15 @@ keyb_fifo(
     .clk        (clk),
     .rst_n      (rst_n),
 
-    .sclr       (cmd_self_test),                                                                                                //input
+    // Clear on controller self-test AND on every keyboard device command
+    // (kclr): a new command's response must be exactly aligned - e.g.
+    // reset 0xFF -> precisely FA,AA and then an EMPTY buffer.  The hps_io
+    // keyboard emits its power-on BAT (0xAA) over the serial PS/2 lines at
+    // core startup; that stray byte lands in this FIFO asynchronously and
+    // the PC110 BIOS's early keyboard test (checkpoints 56h-5Ah) reads
+    // data AFTER the BAT, treats it as keyboard jabber, and logs POST
+    // error 301 -> nonzero error count -> I9990303 -> no disk boot.
+    .sclr       (cmd_self_test || kclr),                                                                                        //input
 
     .wrreq      (inj_wr || ps2_kb_reply_done || (keyb_recv_final && (~(translate) || keyb_recv_buffer != 8'hF0))),              //input
     .data       (inj_wr ? inj_data : (ps2_kb_reply_done)? keyb_reply : (translate)? ({ keyb_translate_escape, 7'd0 } | trans) : keyb_recv_buffer),  //input [7:0]
@@ -1008,8 +1020,8 @@ mouse_fifo(
     .clk        (clk),
     .rst_n      (rst_n),
     
-    .sclr       (cmd_self_test),                                                //input
-    
+    .sclr       (cmd_self_test || mclr),                                        //input
+
     .wrreq      (minj_wr || ps2_mouse_reply_done || mouse_recv_final),          //input
     .data       (minj_wr ? minj_data : (ps2_mouse_reply_done)? mouse_reply : mouse_recv_buffer),  //input [7:0]
     .full       (mouse_fifo_full),                                              //output
