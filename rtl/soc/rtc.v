@@ -144,6 +144,15 @@ wire [7:0] io_readdata_next =
     // the OSD "Enter BIOS Setup" action (and by a real F1 press during
     // POST) and expires on its own.
     (ram_address == 7'h7B) ? (ram_q | (setup_req ? 8'h08 : 8'h00)) :
+    // CMOS 7Eh/7Fh hold the "system control port" address used by the
+    // BIOS's INT15 AX=5380h service (F000:F324): it reads {7Eh,7Fh} into
+    // DX and writes AL there.  The Easy-Setup loader stub invokes that
+    // service right before programming the flash window through the
+    // ECh/EDh config bank - on the real machine the port is the EC's
+    // 15EEh; in our chipset the config bank's unlock port is 00FBh, so
+    // point the service there and the stub's window writes are accepted.
+    (ram_address == 7'h7E) ? 8'h00 :
+    (ram_address == 7'h7F) ? 8'hFB :
                              ram_q;
 
 always @(posedge clk) io_readdata <= io_readdata_next;
