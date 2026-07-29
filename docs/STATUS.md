@@ -124,16 +124,54 @@ A local aux/mouse responder answers the pointing-device reset
 (`FF -> FA AA 00`, identify `F2 -> FA 00`); mouse POST messages are
 display-only and never gate boot.
 
+## PersonaWare milestone (2026-07-28, evening)
+
+**PersonaWare V1.0 runs.**  One root cause unlocked the whole Japanese
+stack: \$FONT.SYS verifies the hardware font ROM with a write-ignore
+probe, so the banked font window is now write-protected (and its decode
+no longer aliases every 1 MiB).  With fonts registering, \$DISP.SYS
+installs V-text, DOSPM's INT15 AX=5000h probe passes (its ERROR 5 was
+exactly that probe failing), and the full PersonaWare desktop appears
+with correct Kanji, working keyboard (F1 opens its Help), and the RTC
+clock right.  A second display blocker fell with it: the Input Status 1
+shim forced bit0=1, deadlocking \$DISP.SYS's interrupts-off wait for
+active display after its mode-12h set - 3DAh/3BAh are no longer shimmed
+and the real ao486 VGA status answers.
+
+Easy-Setup entry: the BIOS's F1 gate reads the held key from the system
+MCU via SMI (un-emulatable), but the same INT19 decision first tests
+CMOS 7Bh bit3.  The OSD "Enter BIOS Setup" action (and any real F1 press
+during POST) forces that bit via rtc setup_req; the request is one-shot,
+consumed at the INT19 read (checkpoint-gated 6Eh-7Fh - POST emits HIGH
+checkpoint codes early, so a plain >= compare mis-fired).  The OSD items
+themselves were dead until now: reset-style CONF_STR entries take ONE
+index char ("R42"/"R41" parsed as bit 4 + junk); they are rF/rG =
+status[47]/[48].  The divert is trace-verified (7Bh read returns 0x0A,
+one-shot clears).  The interactive setup UI is a separate 128 KiB flash
+module the loader (F000:DD5D) copies through a flash-window remap - now
+modeled (easysetup_remap: eced 11h/12h zero + planar-control bit2, L2
+aliases E/F reads to the module's DDR copy at C0000h) plus CMOS 7Eh/7Fh
+pointing the loader's INT15 5380h unlock at the config bank.
+
+Both test units run the same full-effort build (worst slack -0.233 ns).
+Unit 2's black graphics screen was an OLD patched-Main binary, not the
+core - Main is synced between units now (backup MiSTer.bak-20260729).
+
 Known follow-ups:
 
-- PersonaWare's launcher reports "Error occurred in initializing DOS PM /
-  ERROR 5" and falls back to the DOS prompt - GUI init not yet diagnosed
+- Easy-Setup UI: flash-window remap + unlock built, hardware verification
+  pending (setup currently reaches the I9990303 gateway; the icon screen's
+  int16 loop treats any key as "retry boot", NOT as setup entry)
+- EMM386 warns "Option ROM or RAM detected within page frame" and pauses:
+  fixed by open-bussing CC000h-DBFFFh (commit 91d00d0), build pending
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
-- one ARM-side Linux reboot was observed on the first load of the
-  boot-capable RBF (not reproduced on reload) - watch for recurrence
+- MiSTer Main crashes and respawns on load_core while the PC110 core runs
+  (FPGA keeps running; automation must timeout FIFO writes) - suspect our
+  Main patch, not yet investigated
 - RAM-size OSD menu (4/8/12/20 MB) still to be added
-- current RBFs are FAST-fit debug builds; do a full-effort fit for release
+- the EBDA errlog snoop and 8042/CMOS trace tags are debug aids; strip or
+  gate them for a release build
 
 Hardware smoke tests should record:
 
