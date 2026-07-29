@@ -1,4 +1,4 @@
-# IBM Palm Top PC 110 for MiSTer
+# IBM Palm Top PC 110 Core for MiSTer
 
 [![RTL tests](https://github.com/ahmadexp/PC110_MiSTer/actions/workflows/test.yml/badge.svg)](https://github.com/ahmadexp/PC110_MiSTer/actions/workflows/test.yml)
 ![Quartus](https://img.shields.io/badge/Quartus-17.0.2-blue)
@@ -15,20 +15,6 @@ on the PC110 planar. The current implementation completes the original IBM
 BIOS POST, runs IBM Easy-Setup, and boots PC DOS J7.0/V into PersonaWare on
 MiSTer hardware. See [docs/STATUS.md](docs/STATUS.md) for measured behavior and
 remaining device-level work.
-
-## MiSTer submission status
-
-Submitted for official MiSTer inclusion on July 29, 2026. The public source and
-release package are awaiting maintainer review and an invitation to transfer
-the repository to the `MiSTer-devel` organization.
-
-- Core and hardware validation: [submission record](docs/SUBMISSION.md)
-- Required Main integration:
-  [MiSTer-devel/Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252)
-- Supporting Main build fix:
-  [MiSTer-devel/Main_MiSTer#1253](https://github.com/MiSTer-devel/Main_MiSTer/pull/1253)
-
-This section will be updated as the review progresses.
 
 ## What is implemented
 
