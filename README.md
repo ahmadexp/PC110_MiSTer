@@ -93,6 +93,9 @@ paths for the complete font and BIOS images.
 
 The core identifies itself as `PC110` everywhere: the OSD title, the config
 directory, `/tmp/CORENAME`, and the ROM search path (`games/PC110`).
+The deployed bitstream is named `IBM PC110_<timestamp>.rbf`, so MiSTer's core
+browser shows the full machine name while the internal `PC110` identifier
+continues to select the existing x86 support and configuration paths.
 
 MiSTer Main activates its x86 support (IDE image mounting, CMOS) by core
 name, and stock Main only recognizes `AO486`.  This repository therefore
