@@ -35,6 +35,22 @@ and behavioral observations from PC110-EMU.  PC110-EMU is used as an oracle,
 not translated directly: its interpreter includes synthetic exits and
 machine-specific shortcuts that are not hardware behavior.
 
+## Hardware screenshots
+
+### IBM Easy-Setup
+
+The original IBM setup module running from the PC110 flash image, with working
+keyboard navigation:
+
+![IBM PC110 Easy-Setup](docs/images/ibm-pc110-easy-setup.png)
+
+### IBM PC DOS J7.0/V and PersonaWare
+
+PersonaWare V1.0 after an unattended boot, with Japanese fonts and keyboard
+input working:
+
+![IBM PC110 PersonaWare desktop](docs/images/ibm-pc110-personaware.png)
+
 ## Required ROMs
 
 ROMs are not distributed by this repository.
