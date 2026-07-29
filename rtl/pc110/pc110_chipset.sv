@@ -463,7 +463,12 @@ module pc110_chipset
 	// bit4=1 as before and fully passes, so the keyboard still works.
 	logic [7:0] ckpt_last;
 	assign kbd_hide  = (ckpt_last == 8'h56);
-	assign ckpt_boot = (ckpt_last >= 8'h6E);
+	// Boot-decision window ONLY: 6Eh (pre-INT19, F000:52B5), 6Fh (INT19
+	// entry, 7DE4) and the boot-retry codes up to 7Fh.  POST also emits
+	// HIGH checkpoint values early (F0h-FAh, BEh/BFh during the memory
+	// phase), so a plain >= 6Eh comparison let an early CMOS 7Bh read
+	// consume the setup request tens of seconds before INT19 sampled it.
+	assign ckpt_boot = (ckpt_last >= 8'h6E) && (ckpt_last < 8'h80);
 
 	always_ff @(posedge clk) begin
 		io_write_d <= io_write;
