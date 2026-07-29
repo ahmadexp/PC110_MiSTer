@@ -553,11 +553,12 @@ module pc110_chipset
 			plog_tail <= plog_tail + 1'd1;
 		end
 		// CMOS reads (port 71h) of the boot-order/diagnostic bytes: tag
-		// 'C'=0Eh diag, 'c'=1Dh order-lo, 'i'=1Eh order-hi, so we can see
-		// exactly what the INT19 boot-list builder reads
+		// 'C'=0Eh diag, 'c'=1Dh order-lo, 'i'=1Eh order-hi, plus 'B'=7Bh
+		// (the INT19 enter-setup flag read at F000:813E - the logged value
+		// shows whether the forced bit3 actually reached the BIOS)
 		else if(io_read_d && !io_read && io_address == 16'h0071 &&
-		        (cmos_sel == 7'h0E || cmos_sel == 7'h1D || cmos_sel == 7'h1E)) begin
-			plog_fifo[plog_tail] <= {(cmos_sel==7'h0E)?8'h43:(cmos_sel==7'h1D)?8'h63:8'h69, io_snoop};
+		        (cmos_sel == 7'h0E || cmos_sel == 7'h1D || cmos_sel == 7'h1E || cmos_sel == 7'h7B)) begin
+			plog_fifo[plog_tail] <= {(cmos_sel==7'h0E)?8'h43:(cmos_sel==7'h1D)?8'h63:(cmos_sel==7'h1E)?8'h69:8'h42, io_snoop};
 			plog_tail <= plog_tail + 1'd1;
 		end
 		// EBDA POST-error-log writes (from the L2 snoop): the moment an
