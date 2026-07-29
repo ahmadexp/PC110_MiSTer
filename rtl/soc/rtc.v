@@ -42,6 +42,9 @@ module rtc(
 
 	// force CMOS 7Bh bit3 (enter setup on this boot) while held
 	input             setup_req,
+	// pulses when the guest reads CMOS 7Bh while setup_req is held, so the
+	// requester can one-shot the request (INT19 reads it at F000:813E)
+	output reg        setup_ack,
 
 	//mgmt slave
 	/*
@@ -87,6 +90,12 @@ end
 reg io_read_last;
 always @(posedge clk) begin if(rst_n == 1'b0) io_read_last <= 1'b0; else if(io_read_last) io_read_last <= 1'b0; else io_read_last <= io_read; end 
 wire io_read_valid = io_read && io_read_last == 1'b0;
+
+always @(posedge clk) begin
+    if(rst_n == 1'b0) setup_ack <= 1'b0;
+    else              setup_ack <= io_read_valid && io_address == 1'b1 &&
+                                   ram_address == 7'h7B && setup_req;
+end
 
 //------------------------------------------------------------------------------ io read
 

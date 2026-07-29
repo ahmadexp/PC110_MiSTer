@@ -57,7 +57,12 @@ module pc110_chipset
 	// bit4 = 0) during this window so the test - whose pass path needs an
 	// SMM service ao486 cannot provide - is skipped.  See the checkpoint
 	// tracker below.
-	output logic        kbd_hide
+	output logic        kbd_hide,
+
+	// asserted once POST reaches the boot phase (checkpoint 6Eh onward):
+	// gates the CMOS-7Bh setup-request acknowledge so only the INT19
+	// boot-decision read consumes the request.
+	output logic        ckpt_boot
 );
 
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
@@ -458,7 +463,8 @@ module pc110_chipset
 	// no disk boot).  The MAIN keyboard test (checkpoint 6Dh) runs with
 	// bit4=1 as before and fully passes, so the keyboard still works.
 	logic [7:0] ckpt_last;
-	assign kbd_hide = (ckpt_last == 8'h56);
+	assign kbd_hide  = (ckpt_last == 8'h56);
+	assign ckpt_boot = (ckpt_last >= 8'h6E);
 
 	always_ff @(posedge clk) begin
 		io_write_d <= io_write;

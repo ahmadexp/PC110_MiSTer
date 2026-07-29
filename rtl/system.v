@@ -30,6 +30,7 @@ module system
 	input         ps2_kbdat_in,
 	input         inject_f1,
 	input         bios_setup_req,
+	output        bios_setup_ack,
 	output        ps2_kbclk_out,
 	output        ps2_kbdat_out,
 	input         ps2_mouseclk_in,
@@ -234,6 +235,11 @@ wire       pc110_errlog_wr;
 wire [7:0] pc110_errlog_tag;
 wire [7:0] pc110_errlog_byte;
 wire       pc110_kbd_hide;
+wire       pc110_ckpt_boot;
+wire       rtc_setup_ack;
+// only the INT19 boot-decision read (checkpoint 6Eh onward) consumes the
+// setup request; earlier incidental CMOS 7Bh reads must not.
+assign bios_setup_ack = rtc_setup_ack & pc110_ckpt_boot;
 
 l2_cache cache
 (
@@ -427,7 +433,8 @@ pc110_chipset pc110
 	.errlog_wr           (pc110_errlog_wr),
 	.errlog_tag          (pc110_errlog_tag),
 	.errlog_byte         (pc110_errlog_byte),
-	.kbd_hide            (pc110_kbd_hide)
+	.kbd_hide            (pc110_kbd_hide),
+	.ckpt_boot           (pc110_ckpt_boot)
 );
 
 iobus iobus
@@ -683,6 +690,7 @@ rtc rtc
 	.memcfg            (memcfg),
 	.bootcfg           ({bootcfg[5:2], bootcfg[1:0] ? bootcfg[1:0] : {~fdd0_inserted, fdd0_inserted}}),
 	.setup_req         (bios_setup_req),
+	.setup_ack         (rtc_setup_ack),
 
 	.irq               (irq_8)
 );
