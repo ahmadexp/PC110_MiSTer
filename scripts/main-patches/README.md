@@ -12,8 +12,7 @@ for upstream review:
 4. `0004` fixes a generic `errno` macro collision exposed by MiSTer's legacy
    Main build toolchain.
 
-PC110 is not aliased to AO486. Both machines use Main's shared x86 transport,
-but each has its own profile and policy.
+PC110 uses Main's shared x86 transport with its own profile and policy.
 
 Apply the series to a clean Main checkout:
 

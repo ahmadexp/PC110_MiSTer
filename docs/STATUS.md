@@ -20,7 +20,7 @@ Two important corrections follow from that rule:
 
 | Area | State | Notes |
 |---|---|---|
-| CPU | inherited | ao486 no-FPU core; PLL power-on and runtime selection are both forced to its 30 MHz profile, the closest characterized PC110 timing |
+| CPU | inherited | 486SX-compatible no-FPU core; PLL power-on and runtime selection are fixed at 30 MHz, the closest characterized PC110 timing |
 | RAM | implemented | 20 MiB CPU-visible boundary |
 | BIOS flash | implemented for bring-up | complete 256 KiB image at `C0000h-FFFFFh`; shadow RAM currently shares the same DDR backing |
 | VL82C420 gates | implemented | observed SCAMP, block-2, and EC/ED unlock sequences |
@@ -30,9 +30,9 @@ Two important corrections follow from that rule:
 | font ROM | implemented | 1 MiB DDR image, banked 8 KiB window |
 | inking | minimal | idle/status behavior needed for enumeration only |
 | EC-A / EC-B | captured defaults | not a functional power-management microcontroller |
-| VGA | inherited placeholder | ao486 VGA, not yet C&T F65535 register-accurate |
-| audio | inherited placeholder | ao486 SB/OPL path, not yet an ES488 DSP-2.01 identity |
-| storage | inherited | ao486 IDE/floppy path; PC110 BIOS compatibility still to be proven |
+| VGA | inherited placeholder | PC-compatible VGA, not yet C&T F65535 register-accurate |
+| audio | inherited placeholder | SB/OPL-compatible path, not yet an ES488 DSP-2.01 identity |
+| storage | inherited | PC-compatible IDE/floppy path; PC110 BIOS compatibility still to be proven |
 
 ## Known architectural debt
 
@@ -47,20 +47,19 @@ Two important corrections follow from that rule:
 5. PCMCIA windows, card insertion, interrupts, and DMA are not connected.
 6. ES488 mixer/DSP identification and exact IRQ/DMA behavior remain to be
    added on top of the inherited sound path.
-7. The forced ao486 30 MHz profile is the closest currently available setting; a
+7. The fixed 30 MHz profile is the closest currently available setting; a
    separately verified 33.333 MHz CPU/timer profile remains future work.
 
 ## Core identity and Main support
 
 The core identifies itself as `PC110`. MiSTer Main supplies a shared x86
 transport for IDE image mounting, CMOS injection and boot-ROM loading. The
-series in `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`; PC110 is
-not treated as AO486. Machine-specific geometry is isolated in the profile,
-while the IDE behavior corrections are separate generic patches suitable for
-upstream review.
+series in `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`.
+Machine-specific geometry is isolated in the profile, while the IDE behavior
+corrections are separate generic patches suitable for upstream review.
 
-The December 2024 upstream ao486 prefetch-reset fix (`be9b103`) is
-cherry-picked into `rtl/ao486/memory/prefetch.v`.
+A December 2024 upstream prefetch-reset correction (`be9b103`) is retained in
+`rtl/ao486/memory/prefetch.v`.
 
 ## Verification
 
@@ -69,7 +68,7 @@ writable PCIC state, font controls, and upper-memory shadow decode with
 Icarus Verilog.
 
 `scripts/sim-post.sh` executes the real 256 KiB flash image from the reset
-vector on the full memory path (ao486 CPU, iobus, pc110_chipset, the modified
+vector on the full memory path (486SX CPU, iobus, pc110_chipset, the modified
 l2_cache, and a latency/backpressure DDR model) and traces all I/O, memory
 writes, flag changes, and executed EIPs.  Findings from that harness:
 
@@ -115,7 +114,7 @@ ROM offsets:
    the BIOS's own gate (8042 status bit4 = inhibited, asserted only inside
    the `56h`-`5Ah` checkpoint window): its pass path ends in a stuck-key
    check that consults the system MCU through an SMI API (`AX=5380h`)
-   whose result returns in CPU registers rewritten by SMM - ao486 has no
+   whose result returns in CPU registers rewritten by SMM - the CPU core has no
    SMM, so the check fails deterministically.  The MAIN keyboard test
    (checkpoint `6Dh`) still runs with bit4=1 and passes.
 
@@ -135,7 +134,7 @@ with correct Kanji, working keyboard (F1 opens its Help), and the RTC
 clock right.  A second display blocker fell with it: the Input Status 1
 shim forced bit0=1, deadlocking \$DISP.SYS's interrupts-off wait for
 active display after its mode-12h set - 3DAh/3BAh are no longer shimmed
-and the real ao486 VGA status answers.
+and the implemented VGA status answers.
 
 Easy-Setup entry: the BIOS's F1 gate reads the held key from the system
 MCU via SMI (un-emulatable), but the same INT19 decision first tests
@@ -161,7 +160,8 @@ core - Main is synced between units now (backup MiSTer.bak-20260729).
 **IBM Easy-Setup is interactive.** The setup request already reached the INT19
 decision (`CMOS 7Bh = 0Ah` once, then `02h` after one-shot consumption), but
 two firmware paths still depended on PC110 system-management behavior absent
-from ao486. `scripts/prepare-roms.sh` now applies two size-preserving patches
+from the current CPU/platform implementation. `scripts/prepare-roms.sh` now
+applies two size-preserving patches
 to the validated IBM image:
 
 - `F000:8145` changes `jnz 815Bh` to `jnz 817Ch`, routing CMOS bit 3 directly

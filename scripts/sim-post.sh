@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full-system POST simulation: ao486 CPU + iobus + pc110_chipset + the
+# Full-system POST simulation: 486SX CPU + iobus + pc110_chipset + the
 # modified l2_cache + a latency-modeled DDR, executing the real PC110
 # flash image from the reset vector.  Traces every I/O access, memory
 # write, carry-flag change, and executed EIP.

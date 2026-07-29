@@ -18,7 +18,7 @@ fi
 
 # The core identifies itself as PC110, so Main keeps every asset under the
 # PC110 name: boot ROMs in games/PC110 and remembered FC6/FC7 paths in
-# config/PC110.f6 and PC110.f7.  Nothing under games/AO486 is touched.
+# config/PC110.f6 and PC110.f7. No other core's assets are touched.
 #
 # Main's x86 support (IDE image mounting, CMOS) activates by core name, so a
 # Main binary that recognizes PC110 is required; see docs/STATUS.md.

@@ -7,7 +7,7 @@
 # Usage: scripts/build-remote.sh
 # Env:   BUILD_HOST (default user@192.168.1.169), BUILD_DIR (default
 #        ~/PC110-Mister), QUARTUS_IMAGE
-#        FAST=1  drop the inherited ao486 timing-closure effort (physical
+#        FAST=1  drop the inherited timing-closure effort (physical
 #                synthesis, final placement optimization, ECO timing) and
 #                use the fast fitter.  Cuts fit time substantially for the
 #                functional-debug loop.  The CPU clock already misses

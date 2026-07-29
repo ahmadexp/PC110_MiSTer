@@ -2,7 +2,7 @@
 
 // When using the 90.5 MHz clk, an 8-bit CLK_DIV and 9-bit X/Y value gives a reading of around 1400 microseconds using the JoyCheck DOS program (by Henrik K Jensen).
 //
-// The "standard" maximum X/Y timing value for old-skool PC joysticks is around 1124 microseconds, so have a good range now for ao486.
+// The "standard" maximum X/Y timing value for old-school PC joysticks is around 1124 microseconds, so this range is sufficient.
 //
 //
 // It should be possible to increase the resolution of the X/Y counters by also decreasing the width of CLK_DIV. eg...

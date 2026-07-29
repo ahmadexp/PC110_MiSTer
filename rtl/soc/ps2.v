@@ -696,7 +696,7 @@ wire ps2_kb_reply_done = keyb_reply_valid && keyb_fifo_counter < 7'd60 && ~(keyb
 //
 // Responder: the PC110 BIOS keyboard POST (F000:6457) sends device
 // commands to port 60h (reset 0xFF, identify 0xF2, ...) and expects the
-// standard replies within a short timeout.  The real ao486 path relays
+// standard replies within a short timeout. The normal path relays
 // the command over the emulated PS/2 serial link to the HPS keyboard and
 // waits for the serial round-trip, which is far slower than the PC110
 // BIOS timeout -> no reply in time -> error 301 is logged, and any logged

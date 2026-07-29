@@ -5,11 +5,10 @@
 ![Target](https://img.shields.io/badge/target-DE10--Nano%20%2F%20MiSTer-orange)
 
 This repository is a standalone MiSTer core for the IBM Palm Top PC 110. It
-retains the open-source ao486-compatible CPU and portions of its PC platform as
-credited implementation dependencies, while the project identity, machine
-profile, chipset behavior, storage policy, configuration and release artifact
-are PC110-specific. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
-dependency boundary.
+uses an open-source 486SX-compatible CPU and reusable PC components, while the
+project identity, machine profile, chipset behavior, storage policy,
+configuration and release artifact are PC110-specific. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the dependency boundary.
 
 This is an engineering core, not yet a cycle-exact replacement for the whole
 PC110 planar.  The current milestone gets the real 256 KiB IBM flash image in
@@ -19,8 +18,8 @@ and placeholder parts.
 
 ## What is implemented
 
-- ao486 486-class CPU, AT peripherals, IDE, floppy, VGA, keyboard, and mouse
-- a forced 30 MHz ao486 CPU profile, immune to stale AO486 overclock settings
+- 486SX-compatible CPU, AT peripherals, IDE, floppy, VGA, keyboard, and mouse
+- a fixed 30 MHz CPU profile, the closest currently characterized PC110 timing
 - PC110 memory geometry: 4 MiB planar RAM plus the 16 MiB expansion card
 - the 256 KiB PC110 flash mapped linearly at `C0000h-FFFFFh`
 - VL82C420/SCAMP configuration interfaces at `22h/23h`, `24h/25h`,
@@ -119,7 +118,7 @@ MiSTer Main currently activates its shared x86 services (IDE image mounting,
 CMOS and boot-ROM loading) from a machine table. The reviewable series in
 `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`, makes explicit
 machine geometry authoritative, and completes the generic ATA commands used by
-the IBM BIOS. PC110 is not aliased to AO486.
+the IBM BIOS.
 
 Apply the series to a clean current Main checkout, then build it with the
 official toolchain container:
@@ -175,9 +174,7 @@ PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 
 ## Provenance and licensing
 
-The base is
-[MiSTer-devel/ao486_MiSTer](https://github.com/MiSTer-devel/ao486_MiSTer),
-which in turn derives from
-[alfikpl/ao486](https://github.com/alfikpl/ao486).  The inherited RTL remains
-under its original licenses; see [LICENSE](LICENSE) and source-file headers.
-No IBM firmware is included.
+Some CPU and platform RTL derives from
+an [upstream 486 project](https://github.com/alfikpl/ao486). It remains under
+its original license and attribution; see [LICENSE](LICENSE) and source-file
+headers. No IBM firmware is included.

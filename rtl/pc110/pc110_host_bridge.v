@@ -1,7 +1,7 @@
 //
 // PC110 host bridge for MiSTer's shared x86 services.
 //
-// Derived from the ao486 hps_ext bridge. The wire protocol is shared with
+// Derived from the upstream x86 host bridge. The wire protocol is shared with
 // MiSTer Main, while machine-specific policy belongs to the PC110 profile.
 //
 // Copyright (c) 2020 Alexey Melnikov

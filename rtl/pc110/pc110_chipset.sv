@@ -1,7 +1,7 @@
 // IBM Palm Top PC 110 board-specific I/O.
 //
-// This module models only state that is outside the standard PC/AT devices in
-// ao486.  Defaults come from the read-only 2026 hardware captures in
+// This module models state outside the shared PC/AT-compatible devices.
+// Defaults come from the read-only 2026 hardware captures in
 // Open-Source-PC110/Discovery/Chipset and Discovery/Pluto.  The EC/ED bank is
 // the VL82C420 shadow/cache bank, not the power MCU mailbox used by older
 // PC110-EMU revisions.
@@ -55,7 +55,7 @@ module pc110_chipset
 	// asserted while POST is inside its EARLY keyboard test (checkpoint
 	// 56h on port 190h); the 8042 reports the keyboard inhibited (status
 	// bit4 = 0) during this window so the test - whose pass path needs an
-	// SMM service ao486 cannot provide - is skipped.  See the checkpoint
+	// SMM service the current CPU cannot provide - is skipped. See the checkpoint
 	// tracker below.
 	output logic        kbd_hide,
 
@@ -325,7 +325,7 @@ module pc110_chipset
 			// detection sets mode 12h and then spins with interrupts off
 			// until (3DA & 09h) == 0 (active display area) - a condition
 			// the shim could never produce, leaving the freshly-cleared
-			// mode-12h screen solid black.  The ao486 VGA free-runs and
+			// mode-12h screen solid black. The VGA implementation free-runs and
 			// returns genuine {vretrace, display} status (vga.v drives the
 			// data when the chipset does not claim the address), which
 			// terminates every poll polarity with real frame timing.
@@ -469,7 +469,7 @@ module pc110_chipset
 	// 0 (keyboard inhibited).  We assert kbd_hide during that window so the
 	// early test is skipped: its pass path ends in a stuck-key check that
 	// consults the system MCU through an SMI API (AX=5380h) - the result
-	// comes back in CPU registers rewritten by SMM, which ao486 does not
+	// comes back in CPU registers rewritten by SMM, which this CPU does not
 	// implement, so the check would read the routine's own CL=ABh and log
 	// POST error 301 deterministically (nonzero error count -> I9990303 ->
 	// no disk boot).  The MAIN keyboard test (checkpoint 6Dh) runs with

@@ -18,7 +18,7 @@ moves the VGA image that started at `E0000h` into shadow memory at `C0000h`.
 
 ## DDR addresses
 
-The ao486 cache drives MiSTer's 64-bit-word DDR address interface with the
+The CPU cache drives MiSTer's 64-bit-word DDR address interface with the
 upper nibble fixed to `3`.  Therefore:
 
 | MiSTer byte address | Content |
