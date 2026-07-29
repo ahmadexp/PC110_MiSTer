@@ -1,5 +1,8 @@
 //
-// hps_ext for ao486
+// PC110 host bridge for MiSTer's shared x86 services.
+//
+// Derived from the ao486 hps_ext bridge. The wire protocol is shared with
+// MiSTer Main, while machine-specific policy belongs to the PC110 profile.
 //
 // Copyright (c) 2020 Alexey Melnikov
 //
@@ -18,7 +21,7 @@
 //
 ///////////////////////////////////////////////////////////////////////
 
-module hps_ext
+module pc110_host_bridge
 (
 	input             clk_sys,
 	inout      [35:0] EXT_BUS,

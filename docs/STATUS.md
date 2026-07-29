@@ -52,13 +52,12 @@ Two important corrections follow from that rule:
 
 ## Core identity and Main support
 
-The core identifies itself as `PC110`.  MiSTer Main gates its x86 support
-(IDE image mounting, CMOS injection, boot-ROM loading) on the core name, so
-a patched Main is required; the one-line `is_x86()` change plus a gcc-6
-compatibility fix live in `scripts/mister-main-pc110.patch` (apply to the
-`upstream-main` tree and build with the misterkun/toolchain container using
-`make BASE=arm-linux-gnueabihf CC='arm-linux-gnueabihf-gcc -mcpu=cortex-a9
--mfpu=neon -mfloat-abi=hard'`).
+The core identifies itself as `PC110`. MiSTer Main supplies a shared x86
+transport for IDE image mounting, CMOS injection and boot-ROM loading. The
+series in `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`; PC110 is
+not treated as AO486. Machine-specific geometry is isolated in the profile,
+while the IDE behavior corrections are separate generic patches suitable for
+upstream review.
 
 The December 2024 upstream ao486 prefetch-reset fix (`be9b103`) is
 cherry-picked into `rtl/ao486/memory/prefetch.v`.
@@ -199,14 +198,22 @@ Hardware evidence:
   `b06ef449802ad310fcbf17aa5aa2df2677d394ab01a09cfb3d815f095a2a7aca`
 - patched PersonaWare VHD SHA-256:
   `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
+- standalone-profile RBF SHA-256:
+  `d806207a8f4affc7e567191b43f29733f17b3f48bc887d27ebf7c37c187b0bb6`
+- current patched Main SHA-256:
+  `b784bf841164c7254da6b7ac0de0964a9d113f7e28ea76318d25df0edc8a6398`
+- 29 July 2026 hardware verification on `192.168.10.251` and
+  `192.168.1.74`: both reported `CORE=PC110`, EBDA error count/code
+  `00h/0000h`, and booted PersonaWare with working storage and video
 
 Known follow-ups:
 
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
-- MiSTer Main crashes and respawns on load_core while the PC110 core runs
-  (FPGA keeps running; automation must timeout FIFO writes) - suspect our
-  Main patch, not yet investigated
+- MiSTer Main crashes and respawns once on `load_core` while the PC110 core
+  runs (FPGA keeps running; automation must timeout FIFO writes); this persists
+  with current upstream Main plus the separated PC110 profile and still needs
+  investigation
 - RAM-size OSD menu (4/8/12/20 MB) still to be added
 - the EBDA errlog snoop and 8042/CMOS trace tags are debug aids; strip or
   gate them for a release build

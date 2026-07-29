@@ -362,7 +362,7 @@ wire        mgmt_wr;
 wire  [7:0] mgmt_req;
 
 wire [35:0] EXT_BUS;
-hps_ext hps_ext
+pc110_host_bridge host_bridge
 (
 	.clk_sys(clk_sys),
 	.EXT_BUS(EXT_BUS),

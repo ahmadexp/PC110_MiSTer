@@ -4,10 +4,12 @@
 ![Quartus](https://img.shields.io/badge/Quartus-17.0.2-blue)
 ![Target](https://img.shields.io/badge/target-DE10--Nano%20%2F%20MiSTer-orange)
 
-This repository is an FPGA bring-up of the IBM Palm Top PC 110, built on the
-MiSTer ao486 core.  It is deliberately based on the 26 March 2022 ao486 source
-(`1c5cbe5301f2ba87e6db6e3de52dc7536a1eac35`) so that the resulting RBF remains
-compatible with the older MiSTer Main binary on the development machine.
+This repository is a standalone MiSTer core for the IBM Palm Top PC 110. It
+retains the open-source ao486-compatible CPU and portions of its PC platform as
+credited implementation dependencies, while the project identity, machine
+profile, chipset behavior, storage policy, configuration and release artifact
+are PC110-specific. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
+dependency boundary.
 
 This is an engineering core, not yet a cycle-exact replacement for the whole
 PC110 planar.  The current milestone gets the real 256 KiB IBM flash image in
@@ -84,8 +86,8 @@ port write. The original input ROM is never modified.
 
 ## Build
 
-MiSTer documents Quartus 17.0.2 as the supported toolchain.  The included
-script uses the ao486 project's reproducible Quartus container:
+MiSTer documents Quartus 17.0.2 as the supported toolchain. The included
+script uses a reproducible MiSTer Quartus container:
 
 ```sh
 scripts/test.sh
@@ -113,15 +115,23 @@ The deployed bitstream is named `IBM PC110_<timestamp>.rbf`, so MiSTer's core
 browser shows the full machine name while the internal `PC110` identifier
 continues to select the existing x86 support and configuration paths.
 
-MiSTer Main activates its x86 support (IDE image mounting, CMOS) by core
-name, and stock Main only recognizes `AO486`.  This repository therefore
-carries a one-line patch in `upstream-main/user_io.cpp` that adds `PC110` to
-Main's `is_x86()` check.  Build the patched Main with the official toolchain
-container and install it alongside the core:
+MiSTer Main currently activates its shared x86 services (IDE image mounting,
+CMOS and boot-ROM loading) from a machine table. The reviewable series in
+`scripts/main-patches` adds a distinct `X86_PROFILE_PC110`, makes explicit
+machine geometry authoritative, and completes the generic ATA commands used by
+the IBM BIOS. PC110 is not aliased to AO486.
+
+Apply the series to a clean current Main checkout, then build it with the
+official toolchain container:
 
 ```sh
-docker run --rm -v "$PWD/upstream-main:/mister" -w /mister \
-  misterkun/toolchain make
+scripts/apply-main-patches.sh /path/to/Main_MiSTer
+
+docker run --rm --platform linux/arm \
+  -v "/path/to/Main_MiSTer:/mister" -w /mister \
+  misterkun/toolchain sh -lc \
+  "make BASE=arm-linux-gnueabihf \
+    CC='arm-linux-gnueabihf-gcc -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard'"
 ```
 
 The complete flash load is not redundant.  Main's normal `boot1.rom` path
@@ -142,7 +152,7 @@ The helper creates a `.pre-noems` backup before changing `CONFIG.SYS`.
 ## Using the core
 
 - Select the timestamped PC110 core in `_Computer`.
-- Press `Win+F12` for the ao486 OSD.
+- Press `Win+F12` for the PC110 OSD.
 - Mount a raw VHD at IDE 0-0 if the BIOS gets as far as boot selection.
 - Use Reset after changing storage.
 
@@ -154,7 +164,9 @@ PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 ## Source layout
 
 - `PC110.sv` — MiSTer top level and PC110 configuration string
+- `docs/ARCHITECTURE.md` — standalone-core and reused-IP boundary
 - `rtl/pc110/pc110_chipset.sv` — board-specific I/O and shadow registers
+- `rtl/pc110/pc110_host_bridge.v` — shared x86 service transport
 - `rtl/cache/l2_cache.v` — 20 MiB boundary, upper-memory write protection,
   and font-window remap
 - `rtl/soc/rtc.v` — PC110 CMOS translation

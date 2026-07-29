@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ahmadexp <ahmadexp@gmail.com>
+Date: Tue, 28 Jul 2026 23:32:20 -0700
+Subject: [PATCH 1/4] IDE: honor explicit core geometry
+
+---
+ ide.cpp | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/ide.cpp b/ide.cpp
+index 1452a5f..329e8d8 100644
+--- a/ide.cpp
++++ b/ide.cpp
+@@ -473,9 +473,12 @@ void ide_img_set(uint32_t drvnum, fileTYPE *f, int cd, int sectors, int heads, i
+ 	{
+ 		if (drive->present)
+ 		{
+-			if (!drive->chd_f) 
++			if (!drive->chd_f)
+ 			{
+-				if (parse_vhd_config(drive)) ide_set_geometry(drive, sectors, heads);
++				// Geometry explicitly supplied by the core profile takes
++				// precedence over metadata embedded in the image.
++				if (sectors && heads) ide_set_geometry(drive, sectors, heads);
++				else if (parse_vhd_config(drive)) ide_set_geometry(drive, sectors, heads);
+ 				else ide_set_geometry(drive, drive->spt, drive->heads);
+ 			}
+ 			else ide_set_geometry(drive, sectors, heads);
