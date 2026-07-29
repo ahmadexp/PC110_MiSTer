@@ -69,7 +69,11 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// while high (Easy-Setup loader window, see pc110_chipset.sv), reads
 	// of E0000h-FFFFFh alias to C0000h-DFFFFh - the DDR copy of the
 	// flash's lower 128 KiB, which holds the Easy-Setup module.
-	input             PC110_EASYSETUP
+	input             PC110_EASYSETUP,
+
+	// while high (setup request armed), reads of EBDA:0xC5 return 01h so
+	// the INT19 setup gate (F000:816A) routes into the Easy-Setup loader
+	input             PC110_SETUP_FORCE
 );
    
 
@@ -172,7 +176,16 @@ assign DDRAM_BE       = ram_be;
 assign DDRAM_WE       = ram_we;
 
 assign CPU_BUSY       = (state == IDLE) ? DDRAM_BUSY : (vgabusy | ram_we);
-assign CPU_DOUT       = vga_ram ? vga_data_r : readdata_cache[cache_mux];
+// While the Easy-Setup request is armed, reads of EBDA:0xC5 (guest phys
+// 9FCC5h = dword 27F31h byte lane 1) return 01h.  The INT19 setup gate
+// (F000:816A) checks that byte - the BIOS itself never writes it - and
+// routing it through the L2 read path makes the override cache-proof
+// (an HPS-side DDR poke is invisible whenever the line sits dirty in
+// this write-back cache).  Same arming window as the CMOS 7Bh divert.
+wire setup_flag_rd = PC110_SETUP_FORCE && (CPU_ADDR_1 == 30'h0027F31);
+assign CPU_DOUT       = vga_ram ? vga_data_r :
+                        setup_flag_rd ? ((readdata_cache[cache_mux] & 32'hFFFF00FF) | 32'h00000100) :
+                        readdata_cache[cache_mux];
 assign CPU_DOUT_READY = ram_dout_ready;
 
 assign VGA_DOUT       = vga_data[7:0];

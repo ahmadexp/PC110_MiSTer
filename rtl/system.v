@@ -253,6 +253,7 @@ l2_cache cache
 	.PC110_ERRLOG_TAG  (pc110_errlog_tag),
 	.PC110_ERRLOG_BYTE (pc110_errlog_byte),
 	.PC110_EASYSETUP   (pc110_easysetup_remap),
+	.PC110_SETUP_FORCE (bios_setup_req),
 
 	.CPU_ADDR          (mem_address),
 	.CPU_DIN           (mem_writedata),
