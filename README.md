@@ -52,12 +52,19 @@ The supported BIOS is 262,144 bytes with SHA-256:
 232101c88466f311bcc32fbc215a4d7569f695ce19f9c07ca67ce2aee5232312
 ```
 
-The script validates the image and creates:
+The script validates the original image, applies two minimal Easy-Setup
+compatibility patches to its prepared copy, and creates:
 
 - `boot1.rom`: flash offsets `00000h-2FFFFh` (192 KiB, mapped at `C0000h`)
 - `boot0.rom`: flash offsets `30000h-3FFFFh` (64 KiB, mapped at `F0000h`)
 - `pc110_bios.bin`: the complete flash image for direct DDR loading
 - `pc110_font.bin`: optional 1 MiB Japanese font image
+
+The prepared 256 KiB image has SHA-256
+`e906af0cb235ef490b9d5d24eab300bcf865bd112dd8a096bdf1890816933eaa`.
+The patches route the CMOS setup request directly to the IBM loader and replace
+the loader's SMM-dependent configuration unlock with the equivalent direct
+port write. The original input ROM is never modified.
 
 ## Build
 
@@ -80,17 +87,15 @@ With key-based SSH access to a MiSTer:
 MISTER_HOST=root@192.168.1.74 scripts/deploy-mister.sh
 ```
 
-The script:
-
-1. makes a timestamped backup under
-   `/media/fat/games/AO486/.pc110-backup-*`;
-2. installs a timestamped RBF in `/media/fat/_Computer`;
-3. stages PC110 assets under `/media/fat/games/PC110`;
-4. installs the split ROMs in `/media/fat/games/AO486`; and
-5. creates remembered FC6/FC7 paths for the complete font and BIOS images.
+The script installs a timestamped RBF in `/media/fat/_Computer`, stages all
+ROM assets under `/media/fat/games/PC110`, and creates remembered FC6/FC7
+paths for the complete font and BIOS images.
 
 The core identifies itself as `PC110` everywhere: the OSD title, the config
 directory, `/tmp/CORENAME`, and the ROM search path (`games/PC110`).
+The deployed bitstream is named `IBM PC110_<timestamp>.rbf`, so MiSTer's core
+browser shows the full machine name while the internal `PC110` identifier
+continues to select the existing x86 support and configuration paths.
 
 MiSTer Main activates its x86 support (IDE image mounting, CMOS) by core
 name, and stock Main only recognizes `AO486`.  This repository therefore
@@ -108,12 +113,15 @@ historically loads only part of the image, while early PC110 POST needs all
 256 KiB at `C0000h-FFFFFh`.  FC7 writes the full image directly to DDR at
 `300C0000h`; the split images overlay the same bytes.
 
-To restore the AO486 files later, pass the backup path printed by deployment:
+The PersonaWare disk's original EMM386 configuration requests an EMS page
+frame that overlaps the PC110 upper-memory map and pauses on every boot.
+Patch a copy of that VHD to use EMM386 as an XMS/UMB provider without EMS:
 
 ```sh
-MISTER_HOST=root@192.168.1.74 \
-  scripts/restore-mister.sh /media/fat/games/AO486/.pc110-backup-TIMESTAMP
+scripts/patch-personaware-noems.sh /path/to/Personaware-disk.vhd
 ```
+
+The helper creates a `.pre-noems` backup before changing `CONFIG.SYS`.
 
 ## Using the core
 
@@ -122,10 +130,9 @@ MISTER_HOST=root@192.168.1.74 \
 - Mount a raw VHD at IDE 0-0 if the BIOS gets as far as boot selection.
 - Use Reset after changing storage.
 
-At this stage, a successful smoke test means that the FPGA configures, MiSTer
-recognizes the core as `AO486`, the direct ROM loads succeed, and the IBM BIOS
-begins POST.  Reaching Personaware or booting an operating system depends on
-additional PC110 chipset and C&T F65535 work listed in
+The verified hardware milestone is a zero-error POST, IBM Easy-Setup with
+working keyboard navigation, and an unattended PC DOS J7.0/V boot into the
+PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 [docs/STATUS.md](docs/STATUS.md).
 
 ## Source layout

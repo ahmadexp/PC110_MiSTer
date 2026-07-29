@@ -56,7 +56,24 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// not match the planar array (0Bh), accesses inside the 4 MiB planar
 	// bank fold their row bits so a write at +400h reads back at the base
 	// address, and the expansion region does not respond.
-	input   [7:0] PC110_DRAM_CFG0
+	input   [7:0] PC110_DRAM_CFG0,
+
+	// PC110 debug: pulse when POST writes its error log in the EBDA
+	// (count byte at phys 9FC17h, first code word at 9FC18h).  Fed to the
+	// chipset post-logger so the exact moment an error is logged is
+	// visible in the serial trace, interleaved with checkpoints and I/O.
+	output reg        PC110_ERRLOG_WR,
+	output reg  [7:0] PC110_ERRLOG_TAG,
+	output reg  [7:0] PC110_ERRLOG_BYTE,
+
+	// while high (Easy-Setup loader window, see pc110_chipset.sv), reads
+	// of E0000h-FFFFFh alias to C0000h-DFFFFh - the DDR copy of the
+	// flash's lower 128 KiB, which holds the Easy-Setup module.
+	input             PC110_EASYSETUP,
+
+	// while high (setup request armed), reads of EBDA:0xC5 return 01h so
+	// the INT19 setup gate (F000:816A) routes into the Easy-Setup loader
+	input             PC110_SETUP_FORCE
 );
    
 
@@ -159,7 +176,16 @@ assign DDRAM_BE       = ram_be;
 assign DDRAM_WE       = ram_we;
 
 assign CPU_BUSY       = (state == IDLE) ? DDRAM_BUSY : (vgabusy | ram_we);
-assign CPU_DOUT       = vga_ram ? vga_data_r : readdata_cache[cache_mux];
+// While the Easy-Setup request is armed, reads of EBDA:0xC5 (guest phys
+// 9FCC5h = dword 27F31h byte lane 1) return 01h.  The INT19 setup gate
+// (F000:816A) checks that byte - the BIOS itself never writes it - and
+// routing it through the L2 read path makes the override cache-proof
+// (an HPS-side DDR poke is invisible whenever the line sits dirty in
+// this write-back cache).  Same arming window as the CMOS 7Bh divert.
+wire setup_flag_rd = PC110_SETUP_FORCE && (CPU_ADDR_1 == 30'h0027F31);
+assign CPU_DOUT       = vga_ram ? vga_data_r :
+                        setup_flag_rd ? ((readdata_cache[cache_mux] & 32'hFFFF00FF) | 32'h00000100) :
+                        readdata_cache[cache_mux];
 assign CPU_DOUT_READY = ram_dout_ready;
 
 assign VGA_DOUT       = vga_data[7:0];
@@ -214,11 +240,21 @@ wire pc110_upper_rgn =
 // PC110-EMU, which runs this BIOS, likewise backs C0000-FFFFF with plain
 // writable RAM.  PC110_SHADOW_WE is kept wired for future separation of
 // the flash image from shadow RAM (see docs/STATUS.md debt item 1).
-wire rom_rgn = 1'b0;
+// Full upper-address compare: with only [17:11] compared the window
+// aliased every 1 MiB, so extended-memory accesses at 1DE000h, 2DE000h,
+// ... silently hit the font window instead of RAM.
+wire pc110_font_rgn = PC110_FONT_EN &&
+	(CPU_ADDR[29:11] == {12'h000, PC110_FONT_SEG[7:1]});
+// The banked font window must be write-IGNORE like the real font ROM:
+// $FONT.SYS's hardware probe (file offset 6618h) writes 55AAh over the
+// AA55h signature and requires the readback to be UNCHANGED before it
+// will register the hardware font sets.  With the window writable, that
+// probe fails, no DBCS fonts register (the disk carries no $JPN*.FNT
+// fallback), $DISP.SYS's INT15 AX=5000h font query gets AH=86h, V-text
+// never installs, and Japanese text renders as garbage.
+wire rom_rgn = pc110_font_rgn;
 wire vga_rgn = (CPU_ADDR[ADDRBITS+1:15] == 'h5)  && ((CPU_ADDR[14:13] & vga_mask) == vga_cmp);
 wire shr_rgn = (CPU_ADDR[ADDRBITS+1:11] == 'h67) && shr_rgn_en;
-wire pc110_font_rgn = PC110_FONT_EN &&
-	(CPU_ADDR[17:11] == PC110_FONT_SEG[7:1]);
 wire [ADDRBITS:0] pc110_font_addr =
 	25'h0400000 + {8'h00, PC110_FONT_BANK, 10'h000} + CPU_ADDR[10:1];
 // 20 MiB installed: 4 MiB planar RAM plus the 16 MiB expansion card.
@@ -241,14 +277,33 @@ wire pc110_fold = ~pc110_cfg_settled && (CPU_ADDR < 30'h00028000);
 wire pc110_vga_rom_alias =
 	(PC110_ROMSET == 8'h19) &&
 	(CPU_ADDR[ADDRBITS+1:14] == 'hC);
+// Easy-Setup loader window: E0000h-FFFFFh (words 38000h-3FFFFh) fetch the
+// flash's lower 128 KiB, whose DDR copy sits at guest C0000h-DFFFFh
+// (-8000h words).  That copy is pristine: C-segment writes alias away
+// (pc110_vga_rom_alias) and nothing writes the D segment.
+wire pc110_easysetup_alias = PC110_EASYSETUP &&
+	(CPU_ADDR[29:15] == 15'h7);
 wire [29:0] pc110_rom_addr =
-	pc110_vga_rom_alias ? (CPU_ADDR + 30'h00008000) : CPU_ADDR;
+	pc110_easysetup_alias ? (CPU_ADDR - 30'h00008000) :
+	pc110_vga_rom_alias   ? (CPU_ADDR + 30'h00008000) : CPU_ADDR;
 wire [29:0] cpu_addr_m = pc110_fold ?
 	(pc110_rom_addr & ~30'h00000700) : pc110_rom_addr;
 
-wire ram_rgn = (CPU_ADDR < 30'h00100000) ||
+// CC000h-DBFFFh is open bus on the real PC110: the video option ROM
+// decode ends below CC000h and nothing occupies the D segment (the font
+// window sits at DE000h).  IBM's shipped CONFIG.SYS relies on that -
+// EMM386 puts its EMS page frame at CC00h and scans it for ROM/RAM
+// first.  Our ROMSET alias made the whole C segment readable (video
+// BIOS image bytes at CC000h-CFFFFh), so EMM386 warned "Option ROM or
+// RAM detected within page frame" and paused the boot.  Words 33000h-
+// 36FFFh = bytes CC000h-DBFFFh; the CE000h unlock window (shr_rgn)
+// stays mapped.
+wire pc110_ems_open = (CPU_ADDR[29:12] >= 18'h33) && (CPU_ADDR[29:12] <= 18'h36) &&
+	~shr_rgn;
+
+wire ram_rgn = (((CPU_ADDR < 30'h00100000) ||
 	((CPU_ADDR < 30'h00500000) && pc110_cfg_settled) ||
-	pc110_upper_rgn || pc110_font_rgn;
+	pc110_upper_rgn) && ~pc110_ems_open) || pc110_font_rgn;
 
 wire [7:0] be64 = CPU_ADDR[0] ? {CPU_BE, 4'h0} : {4'h0, CPU_BE};
 
@@ -688,5 +743,28 @@ generate
 		);
 	end
 endgenerate 
+
+// PC110 debug: EBDA error-log write snoop.  CPU_ADDR/cpu_addr_m are 32-bit
+// -word addresses, so the EBDA error count byte (phys 9FC17h, EBDA:0x17
+// with the EBDA at segment 9FC0h) is dword 27F05h byte lane 3, and the
+// first logged code word (phys 9FC18h) is dword 27F06h lanes 0-1.  A write
+// is accepted exactly when the state machine leaves IDLE with it, so gate
+// on that cycle for a one-shot per write.  Tags: 'J' (4Ah) = count byte
+// written (value = new count), 'j' (6Ah) = code word low byte.
+always @(posedge CLK) begin
+	PC110_ERRLOG_WR <= 1'b0;
+	if (state == IDLE && !DDRAM_BUSY && CPU_WE) begin
+		if (cpu_addr_m == 30'h27F05 && CPU_BE[3]) begin
+			PC110_ERRLOG_WR   <= 1'b1;
+			PC110_ERRLOG_TAG  <= 8'h4A;
+			PC110_ERRLOG_BYTE <= CPU_DIN[31:24];
+		end
+		else if (cpu_addr_m == 30'h27F06 && CPU_BE[0]) begin
+			PC110_ERRLOG_WR   <= 1'b1;
+			PC110_ERRLOG_TAG  <= 8'h6A;
+			PC110_ERRLOG_BYTE <= CPU_DIN[7:0];
+		end
+	end
+end
 
 endmodule

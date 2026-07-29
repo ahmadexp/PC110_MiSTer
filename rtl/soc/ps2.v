@@ -59,6 +59,10 @@ module ps2
 	// the buffer holds set-1 codes (F1 make = 3Bh).
 	input                   inject_f1,
 
+	// while high, status bit4 reads 0 (keyboard inhibited): used to make
+	// the PC110 BIOS skip its EARLY keyboard test (see pc110_chipset.sv)
+	input                   hide_kbd,
+
 	//ps2 mouse
 	input                   ps2_mouseclk,
 	input                   ps2_mousedat,
@@ -91,8 +95,16 @@ wire [7:0] io_readdata_next =
     (io_read_valid && io_address[2:0] == 3'd4)? {
         status_keyboardparityerror,
         status_timeout,
-        ~(mouse_fifo_empty),
-        1'b1, //keyboard inhibit (run the POST keyboard test)
+        // AUXOBF (bit5): "the byte currently in the output buffer is from
+        // the aux/mouse".  That is status_mousebufferfull - the flag that
+        // actually routes port-60h reads to mouse data - NOT raw mouse-FIFO
+        // occupancy.  With ~mouse_fifo_empty here, a mouse reset response
+        // sitting in the (disabled) mouse FIFO pins AUXOBF=1, so the BIOS
+        // treats every keyboard ACK as mouse data, discards it, retries each
+        // keyboard command 6x, gives up, and logs 301.  status_mousebufferfull
+        // respects disable_mouse, so it is 0 while the aux is disabled.
+        status_mousebufferfull,
+        ~hide_kbd, //bit4: 1 = not inhibited; 0 during the early-POST window (test skipped)
         status_lastcommand,
         status_system,
         status_inputbufferfull,
@@ -165,9 +177,21 @@ always @(posedge clk) begin
     else if(cmd_write_command_byte)     translate <= io_writedata[6];
 end
 
+// Power-on default: aux/mouse clock DISABLED (command-byte bit5 = 1).  The
+// real PC110 8042 powers up with the aux port disabled - its command byte
+// reads back ~0x21, and the BIOS OR-sets translate|sysflag to reach the
+// steady 0x65 it runs POST with (Open-Source-PC110/Discovery live BIOS).
+// This matters because the 8042 has ONE shared output buffer: if the aux
+// is enabled and the (hps_io) mouse streams a byte during the keyboard
+// POST, status_mousebufferfull sets, which both steals the port-60h read
+// (io_readdata mux) and blocks the keyboard OBF from re-asserting for the
+// identify's 2nd ID byte - so the BIOS reads the identify ACK, never sees
+// 0xAB, times out, and logs 301 (which blocks disk boot).  Defaulting the
+// aux disabled matches real hardware and keeps the mouse off the shared
+// buffer until software explicitly enables it (0xA8 / command byte).
 reg disable_mouse;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                   disable_mouse <= 1'b0;
+    if(rst_n == 1'b0)                   disable_mouse <= 1'b1;
     else if(cmd_write_command_byte)     disable_mouse <= io_writedata[5];
     else if(cmd_disable_mouse)          disable_mouse <= 1'b1;
     else if(cmd_enable_mouse)           disable_mouse <= 1'b0;
@@ -176,7 +200,7 @@ end
 
 reg disable_mouse_visible;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                   disable_mouse_visible <= 1'b0;
+    if(rst_n == 1'b0)                   disable_mouse_visible <= 1'b1;
     else if(cmd_write_command_byte)     disable_mouse_visible <= io_writedata[5];
     else if(cmd_disable_mouse)          disable_mouse_visible <= 1'b1;
     else if(cmd_enable_mouse)           disable_mouse_visible <= 1'b0;
@@ -200,7 +224,7 @@ end
 
 reg allow_irq_mouse;
 always @(posedge clk) begin
-    if(rst_n == 1'b0)                   allow_irq_mouse <= 1'b1;
+    if(rst_n == 1'b0)                   allow_irq_mouse <= 1'b0;  // IRQ12 masked at power-on (real 8042 default)
     else if(cmd_write_command_byte)     allow_irq_mouse <= io_writedata[1];
 end
 
@@ -230,12 +254,21 @@ reg status_mousebufferfull;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                                   status_mousebufferfull <= 1'b0;
     else if(io_read_valid && io_address[2:0] == 3'd0)   status_mousebufferfull <= 1'b0;
-    // Do not surface mouse data on the shared output buffer while the mouse
-    // is disabled (the BIOS sends 0xA7 before its keyboard POST).  Without
-    // this, spurious/streaming mouse-device bytes steal the port-60h reads
-    // of the keyboard flush, so the keyboard test never sees the keyboard
-    // and logs error 301 - which blocks disk boot.
-    else if(outputbuffer_idle && ~(mouse_fifo_empty) && ~disable_mouse) status_mousebufferfull <= 1'b1;
+    // Disabling the aux drops mouse data from the shared output buffer.
+    // The PC110 BIOS keyboard POST resets the mouse (0xD4,0xFF) while the
+    // aux is briefly enabled, which sets this flag, THEN disables the aux
+    // (command byte 0x65) before the keyboard init commands.  Real hardware
+    // never hits this because a real PS/2 mouse is far too slow to have
+    // answered before the aux is disabled; our hps_io mouse answers
+    // immediately, so the flag would latch and stay stuck (only a port-60h
+    // read clears it, and the BIOS never reads it - it disabled the aux
+    // instead).  A stuck flag routes port-60h reads to mouse data, blocks
+    // the keyboard FIFO from draining, and pins AUXOBF=1 so the BIOS
+    // discards keyboard ACKs as mouse data -> retries every keyboard
+    // command 6x, gives up, logs 301, blocks disk boot.  Clearing it while
+    // the aux is disabled matches the real-hardware outcome.
+    else if(disable_mouse)                              status_mousebufferfull <= 1'b0;
+    else if(outputbuffer_idle && ~(mouse_fifo_empty))   status_mousebufferfull <= 1'b1;
 end
 
 reg status_outputbufferfull;
@@ -367,7 +400,18 @@ reg status_inputbufferfull;
 always @(posedge clk) begin
     if(rst_n == 1'b0)                                       status_inputbufferfull <= 1'b0;
     else if(write_to_keyb || write_to_mouse)                status_inputbufferfull <= 1'b1;
-    else if(input_write_done && status_outputbufferfull)    status_inputbufferfull <= 1'b0;
+    // IBF means "the host wrote a byte the 8042 has not consumed yet".  A
+    // real 8042 clears it as soon as its firmware reads the input register
+    // (microseconds), independent of whether an output byte is ready.  Our
+    // device commands are answered locally, so the byte is consumed
+    // immediately - clear IBF as soon as input_write_done, NOT gated on OBF.
+    // Gating on OBF held IBF set through the whole (slow) response, so the
+    // PC110 BIOS - which resets the mouse then writes command byte 0x65 to
+    // disable the aux - wrote 0x65 while IBF was still stuck, the
+    // command-byte write (cmd_with_param, gated on ~IBF) was dropped,
+    // disable_mouse never flipped, and the mouse kept jamming the keyboard
+    // POST -> 301 -> no boot.
+    else if(input_write_done)                               status_inputbufferfull <= 1'b0;
 end
 
 reg input_write_done;
@@ -381,7 +425,16 @@ always @(posedge clk) begin
     // and the two interleaved response streams misalign the BIOS keyboard
     // POST and keep error 301 logged (which blocks disk boot).
     else if(write_to_keyb)                              input_write_done <= 1'b1;
-    else if(write_to_mouse)                             input_write_done <= 1'b0;
+    // Mark mouse device writes done immediately too (was 1'b0 = relay to the
+    // HPS mouse).  The PC110 BIOS resets the mouse mid keyboard-POST; the
+    // slow serial relay held IBF/input-buffer state long enough that the
+    // BIOS's following command-byte write (0x65, aux-disable) was dropped,
+    // wedging the keyboard POST at error 301.  Consuming the byte locally
+    // frees the input buffer at once so the aux-disable lands and the
+    // keyboard POST completes.  (Trade-off: the trackpad is not relayed for
+    // now; the keyboard - and disk boot - take priority.  A proper mouse
+    // path needs a copy register so the relay can run without pinning IBF.)
+    else if(write_to_mouse)                             input_write_done <= 1'b1;
     else if(ps2_kb_write_done || ps2_mouse_write_done)  input_write_done <= 1'b1;
 end
 
@@ -662,10 +715,12 @@ reg        kr_busy;
 reg  [1:0] kr_pos;
 reg  [1:0] kr_len;
 reg  [7:0] kr_b1, kr_b2;
+reg        kclr;    // clear keyb FIFO on a new device command (see below)
 
 always @(posedge clk) begin
     inj_wr <= 1'b0;
     wtk_d  <= write_to_keyb;
+    kclr   <= write_to_keyb && !wtk_d;
 
     if(rst_n == 1'b0) begin
         inj_ctr <= 22'd0;
@@ -684,8 +739,14 @@ always @(posedge clk) begin
             kr_busy <= 1'b1;
             kr_pos  <= 2'd0;
             case(io_writedata)
-                8'hFF: begin kr_b1 <= 8'hAA; kr_b2 <= 8'h00; kr_len <= 2'd2; end // reset -> FA,AA(BAT)
-                8'hF2: begin kr_b1 <= 8'hAB; kr_b2 <= 8'h83; kr_len <= 2'd3; end // identify -> FA,AB,83
+                8'hFF: begin kr_b1 <= 8'hAA; kr_b2 <= 8'h00; kr_len <= 2'd2; end // reset -> FA,AA(BAT); pass-through, not translated
+                // identify -> FA,AB,41.  The MF2 keyboard's real 2nd ID byte
+                // is 83h, but 8042 scancode translation (which is enabled)
+                // maps 83h -> 41h, and the PC110 BIOS (F000:B068) checks for
+                // the TRANSLATED value 41h, not raw 83h.  Since this local
+                // response is injected past the translation stage, emit the
+                // already-translated 41h directly.
+                8'hF2: begin kr_b1 <= 8'hAB; kr_b2 <= 8'h41; kr_len <= 2'd3; end
                 default: begin kr_b1 <= 8'h00; kr_b2 <= 8'h00; kr_len <= 2'd1; end // ACK only
             endcase
         end
@@ -703,6 +764,56 @@ always @(posedge clk) begin
     end
 end
 
+// Local mouse (aux) responder, mirroring the keyboard responder above.  The
+// PC110 BIOS resets the pointing device (0xD4,0xFF) during POST; if it gets
+// no standard PS/2 mouse reply it retries the reset and then logs a
+// pointing-device POST error -> nonzero error count -> I9990303 halt -> no
+// boot.  Answer locally: reset 0xFF -> FA,AA,00 (ACK,BAT,device-id 0);
+// identify 0xF2 -> FA,00 (ACK, standard mouse id); everything else -> FA.
+// The replies go into the mouse FIFO; the BIOS reads them while the aux is
+// enabled (device present), and once it disables the aux (command byte
+// 0x65) the disable_mouse path drops mouse data from the shared output
+// buffer so it cannot jam the keyboard POST.
+reg        minj_wr;
+reg  [7:0] minj_data;
+reg        wtm_d;
+reg        mr_busy;
+reg  [1:0] mr_pos;
+reg  [1:0] mr_len;
+reg  [7:0] mr_b1, mr_b2;
+reg        mclr;    // clear mouse FIFO on a new device command (same rationale as kclr)
+
+always @(posedge clk) begin
+    minj_wr <= 1'b0;
+    wtm_d   <= write_to_mouse;
+    mclr    <= write_to_mouse && !wtm_d;
+
+    if(rst_n == 1'b0) begin
+        mr_busy <= 1'b0;
+    end
+    else begin
+        if(write_to_mouse && !wtm_d) begin
+            mr_busy <= 1'b1;
+            mr_pos  <= 2'd0;
+            case(io_writedata)
+                8'hFF: begin mr_b1 <= 8'hAA; mr_b2 <= 8'h00; mr_len <= 2'd3; end // reset -> FA,AA,00
+                8'hF2: begin mr_b1 <= 8'h00; mr_b2 <= 8'h00; mr_len <= 2'd2; end // identify -> FA,00
+                default: begin mr_b1 <= 8'h00; mr_b2 <= 8'h00; mr_len <= 2'd1; end // ACK only
+            endcase
+        end
+        else if(mr_busy && !minj_wr) begin
+            minj_wr <= 1'b1;
+            case(mr_pos)
+                2'd0:    minj_data <= 8'hFA;
+                2'd1:    minj_data <= mr_b1;
+                default: minj_data <= mr_b2;
+            endcase
+            mr_pos <= mr_pos + 2'd1;
+            if(mr_pos + 2'd1 >= mr_len) mr_busy <= 1'b0;
+        end
+    end
+end
+
 simple_fifo #(
     .width      (8),
     .widthu     (6)
@@ -711,7 +822,15 @@ keyb_fifo(
     .clk        (clk),
     .rst_n      (rst_n),
 
-    .sclr       (cmd_self_test),                                                                                                //input
+    // Clear on controller self-test AND on every keyboard device command
+    // (kclr): a new command's response must be exactly aligned - e.g.
+    // reset 0xFF -> precisely FA,AA and then an EMPTY buffer.  The hps_io
+    // keyboard emits its power-on BAT (0xAA) over the serial PS/2 lines at
+    // core startup; that stray byte lands in this FIFO asynchronously and
+    // the PC110 BIOS's early keyboard test (checkpoints 56h-5Ah) reads
+    // data AFTER the BAT, treats it as keyboard jabber, and logs POST
+    // error 301 -> nonzero error count -> I9990303 -> no disk boot.
+    .sclr       (cmd_self_test || kclr),                                                                                        //input
 
     .wrreq      (inj_wr || ps2_kb_reply_done || (keyb_recv_final && (~(translate) || keyb_recv_buffer != 8'hF0))),              //input
     .data       (inj_wr ? inj_data : (ps2_kb_reply_done)? keyb_reply : (translate)? ({ keyb_translate_escape, 7'd0 } | trans) : keyb_recv_buffer),  //input [7:0]
@@ -905,10 +1024,10 @@ mouse_fifo(
     .clk        (clk),
     .rst_n      (rst_n),
     
-    .sclr       (cmd_self_test),                                                //input
-    
-    .wrreq      (ps2_mouse_reply_done || mouse_recv_final),                     //input
-    .data       ((ps2_mouse_reply_done)? mouse_reply : mouse_recv_buffer),      //input [7:0]
+    .sclr       (cmd_self_test || mclr),                                        //input
+
+    .wrreq      (minj_wr || ps2_mouse_reply_done || mouse_recv_final),          //input
+    .data       (minj_wr ? minj_data : (ps2_mouse_reply_done)? mouse_reply : mouse_recv_buffer),  //input [7:0]
     .full       (mouse_fifo_full),                                              //output
     .usedw      (mouse_fifo_usedw),                                             //output [5:0]
     

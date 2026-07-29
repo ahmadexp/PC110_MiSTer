@@ -29,6 +29,8 @@ module system
 	input         ps2_kbclk_in,
 	input         ps2_kbdat_in,
 	input         inject_f1,
+	input         bios_setup_req,
+	output        bios_setup_ack,
 	output        ps2_kbclk_out,
 	output        ps2_kbdat_out,
 	input         ps2_mouseclk_in,
@@ -229,12 +231,29 @@ wire  [5:0] video_rd_seg;
 
 assign      DDRAM_CLK = clk_sys;
 
+wire       pc110_errlog_wr;
+wire [7:0] pc110_errlog_tag;
+wire [7:0] pc110_errlog_byte;
+wire       pc110_kbd_hide;
+wire       pc110_ckpt_boot;
+wire       pc110_easysetup_remap;
+wire       rtc_setup_ack;
+// only the INT19 boot-decision read (checkpoint 6Eh onward) consumes the
+// setup request; earlier incidental CMOS 7Bh reads must not.
+assign bios_setup_ack = rtc_setup_ack & pc110_ckpt_boot;
+
 l2_cache cache
 (
 	.CLK               (clk_sys),
 	.RESET             (reset),
 
 	.DISABLE           (l2_disable),
+
+	.PC110_ERRLOG_WR   (pc110_errlog_wr),
+	.PC110_ERRLOG_TAG  (pc110_errlog_tag),
+	.PC110_ERRLOG_BYTE (pc110_errlog_byte),
+	.PC110_EASYSETUP   (pc110_easysetup_remap),
+	.PC110_SETUP_FORCE (bios_setup_req),
 
 	.CPU_ADDR          (mem_address),
 	.CPU_DIN           (mem_writedata),
@@ -413,7 +432,13 @@ pc110_chipset pc110
 	.font_window_enable  (pc110_font_enable),
 	.dram_cfg0           (pc110_dram_cfg0),
 	.postlog_tx          (pc110_postlog_tx),
-	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8)
+	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8),
+	.errlog_wr           (pc110_errlog_wr),
+	.errlog_tag          (pc110_errlog_tag),
+	.errlog_byte         (pc110_errlog_byte),
+	.kbd_hide            (pc110_kbd_hide),
+	.ckpt_boot           (pc110_ckpt_boot),
+	.easysetup_remap     (pc110_easysetup_remap)
 );
 
 iobus iobus
@@ -634,6 +659,7 @@ ps2 ps2
 	.ps2_kbclk_out     (ps2_kbclk_out),
 	.ps2_kbdat_out     (ps2_kbdat_out),
 	.inject_f1         (inject_f1),
+	.hide_kbd          (pc110_kbd_hide),
 
 	.ps2_mouseclk      (ps2_mouseclk_in),
 	.ps2_mousedat      (ps2_mousedat_in),
@@ -667,6 +693,8 @@ rtc rtc
 
 	.memcfg            (memcfg),
 	.bootcfg           ({bootcfg[5:2], bootcfg[1:0] ? bootcfg[1:0] : {~fdd0_inserted, fdd0_inserted}}),
+	.setup_req         (bios_setup_req),
+	.setup_ack         (rtc_setup_ack),
 
 	.irq               (irq_8)
 );

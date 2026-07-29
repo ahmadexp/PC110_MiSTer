@@ -40,6 +40,12 @@ module rtc(
 	input             memcfg,
 	input       [5:0] bootcfg,
 
+	// force CMOS 7Bh bit3 (enter setup on this boot) while held
+	input             setup_req,
+	// pulses when the guest reads CMOS 7Bh while setup_req is held, so the
+	// requester can one-shot the request (INT19 reads it at F000:813E)
+	output reg        setup_ack,
+
 	//mgmt slave
 	/*
 	128.[26:0]: cycles in second
@@ -85,6 +91,12 @@ reg io_read_last;
 always @(posedge clk) begin if(rst_n == 1'b0) io_read_last <= 1'b0; else if(io_read_last) io_read_last <= 1'b0; else io_read_last <= io_read; end 
 wire io_read_valid = io_read && io_read_last == 1'b0;
 
+always @(posedge clk) begin
+    if(rst_n == 1'b0) setup_ack <= 1'b0;
+    else              setup_ack <= io_read_valid && io_address == 1'b1 &&
+                                   ram_address == 7'h7B && setup_req;
+end
+
 //------------------------------------------------------------------------------ io read
 
 wire [7:0] io_readdata_next =
@@ -125,6 +137,22 @@ wire [7:0] io_readdata_next =
     (ram_address == 7'h3F) ? 8'h00 :
     (ram_address == 7'h32) ? rtc_century :
     (ram_address == 7'h37) ? rtc_century :
+    // CMOS 7Bh bit3 = "enter setup on this boot".  The INT19 boot decision
+    // (F000:8143) tests it right before its F1 check; the F1 check itself
+    // reads the system MCU through an SMI service ao486 cannot provide, so
+    // this bit is the only workable Easy-Setup entry.  setup_req is held by
+    // the OSD "Enter BIOS Setup" action (and by a real F1 press during
+    // POST) and expires on its own.
+    (ram_address == 7'h7B) ? (ram_q | (setup_req ? 8'h08 : 8'h00)) :
+    // CMOS 7Eh/7Fh hold the "system control port" address used by the
+    // BIOS's INT15 AX=5380h service (F000:F324): it reads {7Eh,7Fh} into
+    // DX and writes AL there.  The Easy-Setup loader stub invokes that
+    // service right before programming the flash window through the
+    // ECh/EDh config bank - on the real machine the port is the EC's
+    // 15EEh; in our chipset the config bank's unlock port is 00FBh, so
+    // point the service there and the stub's window writes are accepted.
+    (ram_address == 7'h7E) ? 8'h00 :
+    (ram_address == 7'h7F) ? 8'hFB :
                              ram_q;
 
 always @(posedge clk) io_readdata <= io_readdata_next;

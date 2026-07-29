@@ -84,11 +84,132 @@ writes, flag changes, and executed EIPs.  Findings from that harness:
   phase (BDA writes at `410h` onward) under every configuration tested:
   L1 on/off, with/without the prefetch fix, ideal and slow DDR
 
-On hardware the CPU halts before the first BDA write, with junk byte-writes
-visible in low DDR - behavior simulation does not reproduce.  The next
-diagnostic is a POST-code logger: latch chipset writes to `3BCh`, `190h`,
-and `191h` and stream them out the core's UART (`/dev/ttyS1` on the HPS) so
-the on-hardware failure point becomes directly observable.
+The POST-code logger grew into a full serial trace (UART `/dev/ttyS1` on the
+HPS at 115200): POST checkpoints (`190h`), progress (`3BCh`), the complete
+8042 conversation (commands, status, data), the ATA task file, CMOS reads,
+and an L2 snoop of the EBDA POST-error-log writes - all interleaved in
+stream order.  `scratchpad` tooling (`cap.sh` / `decode_plog.py` in the
+session workspace) reloads the core, captures a POST, and decodes it.
+
+## Boot milestone (2026-07-28)
+
+POST completes with **zero errors**, INT19 loads the boot sector from the
+Personaware disk image, and **PC DOS J7.0/V boots to a working `C:\PW>`
+prompt with a fully functional keyboard** (typed commands execute).
+
+The final blocker was keyboard POST error 301 - five stacked causes, found
+with the interleaved trace plus live-BIOS disassembly grounded at exact
+ROM offsets:
+
+1. keyboard identify must return the TRANSLATED ID `AB 41` (BIOS checks
+   `41h` at `F000:B068`), not raw `AB 83`
+2. the 8042's single shared output buffer: AUXOBF (status bit5) must be
+   `status_mousebufferfull` (respecting aux-disable), not raw mouse-FIFO
+   occupancy, or stale mouse data marks keyboard ACKs as mouse bytes
+3. the input buffer (IBF) must free as soon as a device command is
+   consumed; gating it on OBF made the BIOS's aux-disable command-byte
+   write (`65h`) silently drop, wedging the mouse into the shared buffer
+4. device FIFOs are cleared on each new device command so responses are
+   exactly aligned (`FFh` -> precisely `FA AA`); stray hps_io power-on BAT
+   bytes otherwise read as "keyboard jabber"
+5. the EARLY keyboard test (checkpoint `56h`, `F000:4FEF`) is skipped via
+   the BIOS's own gate (8042 status bit4 = inhibited, asserted only inside
+   the `56h`-`5Ah` checkpoint window): its pass path ends in a stuck-key
+   check that consults the system MCU through an SMI API (`AX=5380h`)
+   whose result returns in CPU registers rewritten by SMM - ao486 has no
+   SMM, so the check fails deterministically.  The MAIN keyboard test
+   (checkpoint `6Dh`) still runs with bit4=1 and passes.
+
+A local aux/mouse responder answers the pointing-device reset
+(`FF -> FA AA 00`, identify `F2 -> FA 00`); mouse POST messages are
+display-only and never gate boot.
+
+## PersonaWare milestone (2026-07-28, evening)
+
+**PersonaWare V1.0 runs.**  One root cause unlocked the whole Japanese
+stack: \$FONT.SYS verifies the hardware font ROM with a write-ignore
+probe, so the banked font window is now write-protected (and its decode
+no longer aliases every 1 MiB).  With fonts registering, \$DISP.SYS
+installs V-text, DOSPM's INT15 AX=5000h probe passes (its ERROR 5 was
+exactly that probe failing), and the full PersonaWare desktop appears
+with correct Kanji, working keyboard (F1 opens its Help), and the RTC
+clock right.  A second display blocker fell with it: the Input Status 1
+shim forced bit0=1, deadlocking \$DISP.SYS's interrupts-off wait for
+active display after its mode-12h set - 3DAh/3BAh are no longer shimmed
+and the real ao486 VGA status answers.
+
+Easy-Setup entry: the BIOS's F1 gate reads the held key from the system
+MCU via SMI (un-emulatable), but the same INT19 decision first tests
+CMOS 7Bh bit3.  The OSD "Enter BIOS Setup" action (and any real F1 press
+during POST) forces that bit via rtc setup_req; the request is one-shot,
+consumed at the INT19 read (checkpoint-gated 6Eh-7Fh - POST emits HIGH
+checkpoint codes early, so a plain >= compare mis-fired).  The OSD items
+themselves were dead until now: reset-style CONF_STR entries take ONE
+index char ("R42"/"R41" parsed as bit 4 + junk); they are rF/rG =
+status[47]/[48].  The divert is trace-verified (7Bh read returns 0x0A,
+one-shot clears).  The interactive setup UI is a separate 128 KiB flash
+module the loader (F000:DD5D) copies through a flash-window remap - now
+modeled (easysetup_remap: eced 11h/12h zero + planar-control bit2, L2
+aliases E/F reads to the module's DDR copy at C0000h) plus CMOS 7Eh/7Fh
+pointing the loader's INT15 5380h unlock at the config bank.
+
+Both test units run the same full-effort build (worst slack -0.233 ns).
+Unit 2's black graphics screen was an OLD patched-Main binary, not the
+core - Main is synced between units now (backup MiSTer.bak-20260729).
+
+## Final setup and boot polish (2026-07-28, hardware verified)
+
+**IBM Easy-Setup is interactive.** The setup request already reached the INT19
+decision (`CMOS 7Bh = 0Ah` once, then `02h` after one-shot consumption), but
+two firmware paths still depended on PC110 system-management behavior absent
+from ao486. `scripts/prepare-roms.sh` now applies two size-preserving patches
+to the validated IBM image:
+
+- `F000:8145` changes `jnz 815Bh` to `jnz 817Ch`, routing CMOS bit 3 directly
+  to the existing Easy-Setup loader
+- the relocated stub at `F000:DDE6` replaces its initial
+  `INT 15h AX=5380h` unlock with the equivalent direct `out 00FBh,80h`
+
+MiSTer Main actually executes the split `boot0.rom`/`boot1.rom`, so these are
+generated from the patched copy as well as `pc110_bios.bin`. On unit
+`192.168.1.74`, the serial trace showed `ECED[11]=00h` and `ECED[12]=00h`,
+followed by their restoration. The real IBM Easy-Setup home page appeared,
+and Right Arrow moved selection from Config to Date/Time.
+
+**The EMM386 keypress pause is gone.** Open-bus data (`FFh`) still looks like
+ROM to EMM386, so the earlier CC000h-DBFFFh experiment could not solve the
+warning. The PersonaWare disk now uses:
+
+```text
+DEVICE=C:\DOS\EMM386.EXE NOEMS
+```
+
+The original disk is retained on the test unit as
+`Personaware-disk.pre-noems.vhd`. An unattended cold boot reached PersonaWare
+in under 30 seconds with EBDA POST error count/code `00h/0000h`; DOS/V,
+Japanese fonts, UMB-loaded drivers, keyboard, and the desktop remained
+functional. `scripts/patch-personaware-noems.sh` makes the disk edit
+reproducible and creates a backup before writing.
+
+Hardware evidence:
+
+- prepared BIOS SHA-256:
+  `e906af0cb235ef490b9d5d24eab300bcf865bd112dd8a096bdf1890816933eaa`
+- patched boot0 SHA-256:
+  `b06ef449802ad310fcbf17aa5aa2df2677d394ab01a09cfb3d815f095a2a7aca`
+- patched PersonaWare VHD SHA-256:
+  `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
+
+Known follow-ups:
+
+- the trackpad is not yet relayed to the HPS mouse (the serial relay held
+  IBF and broke POST; needs a copy-register relay that does not pin IBF)
+- MiSTer Main crashes and respawns on load_core while the PC110 core runs
+  (FPGA keeps running; automation must timeout FIFO writes) - suspect our
+  Main patch, not yet investigated
+- RAM-size OSD menu (4/8/12/20 MB) still to be added
+- the EBDA errlog snoop and 8042/CMOS trace tags are debug aids; strip or
+  gate them for a release build
 
 Hardware smoke tests should record:
 
@@ -96,4 +217,4 @@ Hardware smoke tests should record:
 - MiSTer Main version
 - `/tmp/CORENAME`
 - installed ROM sizes and hashes
-- on-screen POST code or failure point
+- serial POST trace (`cap.sh`), EBDA error count/code, and a screenshot

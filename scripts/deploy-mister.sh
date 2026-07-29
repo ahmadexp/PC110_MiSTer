@@ -7,6 +7,8 @@ rbf_path="${repo_dir}/artifacts/PC110.rbf"
 rom_dir="${repo_dir}/artifacts/roms"
 stamp="$(date +%Y%m%d-%H%M%S)"
 remote_stage="/media/fat/games/PC110"
+remote_rbf="/media/fat/_Computer/IBM PC110_${stamp}.rbf"
+remote_rbf_upload="/media/fat/_Computer/PC110.upload.rbf"
 
 if [[ ! -s "${rbf_path}" || ! -s "${rom_dir}/boot0.rom" ||
       ! -s "${rom_dir}/boot1.rom" || ! -s "${rom_dir}/pc110_bios.bin" ]]; then
@@ -25,12 +27,14 @@ fi
 # does not accumulate stale bitstreams across rapid iteration.  Set
 # KEEP_OLD_RBF=1 to retain them.
 if [[ "${KEEP_OLD_RBF:-0}" != "1" ]]; then
-  ssh "${mister_host}" "rm -f /media/fat/_Computer/PC110_*.rbf"
+  ssh "${mister_host}" \
+    "rm -f /media/fat/_Computer/PC110_*.rbf /media/fat/_Computer/IBM\\ PC110_*.rbf"
 fi
 
 ssh "${mister_host}" "mkdir -p '${remote_stage}'"
 
-scp "${rbf_path}" "${mister_host}:/media/fat/_Computer/PC110_${stamp}.rbf"
+scp "${rbf_path}" "${mister_host}:${remote_rbf_upload}"
+ssh "${mister_host}" "mv '${remote_rbf_upload}' '${remote_rbf}'"
 scp "${rom_dir}/boot0.rom" "${rom_dir}/boot1.rom" \
   "${rom_dir}/pc110_bios.bin" "${mister_host}:${remote_stage}/"
 if [[ -s "${rom_dir}/pc110_font.bin" ]]; then
@@ -42,4 +46,4 @@ ssh "${mister_host}" "printf '${remote_stage}/pc110_bios.bin\\0' > /media/fat/co
     printf '${remote_stage}/pc110_font.bin\\0' > /media/fat/config/PC110.f6; \
   fi && sync"
 
-echo "Deployed /media/fat/_Computer/PC110_${stamp}.rbf"
+echo "Deployed ${remote_rbf}"

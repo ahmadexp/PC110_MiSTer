@@ -42,7 +42,38 @@ module pc110_chipset
 	output logic        postlog_tx,
 
 	// value returned on the shared I/O read bus, for the ATA trace
-	input  logic  [7:0] io_snoop
+	input  logic  [7:0] io_snoop,
+
+	// EBDA POST-error-log write snoop from the L2 cache: pulses with a
+	// preformed {tag, byte} pair ('J' = error count written, 'j' = first
+	// logged code word's low byte) so the exact instant an error is
+	// logged appears in the serial trace.
+	input  logic        errlog_wr,
+	input  logic  [7:0] errlog_tag,
+	input  logic  [7:0] errlog_byte,
+
+	// asserted while POST is inside its EARLY keyboard test (checkpoint
+	// 56h on port 190h); the 8042 reports the keyboard inhibited (status
+	// bit4 = 0) during this window so the test - whose pass path needs an
+	// SMM service ao486 cannot provide - is skipped.  See the checkpoint
+	// tracker below.
+	output logic        kbd_hide,
+
+	// asserted once POST reaches the boot phase (checkpoint 6Eh onward):
+	// gates the CMOS-7Bh setup-request acknowledge so only the INT19
+	// boot-decision read consumes the request.
+	output logic        ckpt_boot,
+
+	// asserted while the BIOS's Easy-Setup loader stub (F000:DDE6,
+	// relocated to 3000:0000) holds the flash window open: it zeroes the
+	// E/F-segment shadow read-enables (eced 11h/12h) AND toggles planar
+	// control (port 98h) bit2, then block-copies E0000h-FFFFFh expecting
+	// the LOWER 128 KiB of flash (the Easy-Setup module) there.  The L2
+	// aliases those reads to the module's DDR copy while this is high.
+	// planar_control bit2 is the disambiguator: POST also zeroes eced
+	// 11h/12h transiently during shadow configuration, but never with
+	// bit2 set.
+	output logic        easysetup_remap
 );
 
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
@@ -56,7 +87,6 @@ module pc110_chipset
 	logic [7:0] pos [0:7];
 	logic [7:0] xr [0:127];
 	logic [6:0] xr_index;
-	logic       vstat_flip;
 
 	logic [6:0] scamp_index;
 	logic [7:0] block2_index;
@@ -80,6 +110,8 @@ module pc110_chipset
 	assign font_window_segment = font_segment;
 	assign font_window_enable = font_enable;
 	assign dram_cfg0 = eced[8'h02];
+	assign easysetup_remap = (eced[8'h11] == 8'h00) && (eced[8'h12] == 8'h00) &&
+	                         planar_control[2];
 
 	integer i;
 	initial begin
@@ -287,12 +319,16 @@ module pc110_chipset
 				io_readdata = (planar_setup == 8'hDF) ? pos[io_address[2:0]] : 8'hFF;
 			16'h03D6: io_readdata = {1'b0, xr_index};
 			16'h03D7: io_readdata = xr[xr_index];
-			// Input Status 1 shim: vertical-retrace bit 3 toggles on every
-			// read and display-enable bit 0 stays set, exactly the behavior
-			// the PC110-EMU oracle uses to satisfy the video BIOS retrace
-			// waits.  vga.v still sees the read for its flip-flop side
-			// effects; this only overrides the returned data.
-			16'h03DA, 16'h03BA: io_readdata = {4'h0, vstat_flip, 2'b00, 1'b1};
+			// Input Status 1 (3DAh/3BAh) is NO LONGER shimmed here: the
+			// former toggle-bit3/force-bit0 shim satisfied the video BIOS
+			// retrace waits during bring-up, but $DISP.SYS's adapter
+			// detection sets mode 12h and then spins with interrupts off
+			// until (3DA & 09h) == 0 (active display area) - a condition
+			// the shim could never produce, leaving the freshly-cleared
+			// mode-12h screen solid black.  The ao486 VGA free-runs and
+			// returns genuine {vretrace, display} status (vga.v drives the
+			// data when the chipset does not claim the address), which
+			// terminates every poll polarity with real frame timing.
 			16'h03E0: io_readdata = 8'hFF;
 			16'h03E1: io_readdata = pcic[pcic_index];
 			16'h1160: io_readdata = {1'b0, font_bank[6:0]};
@@ -409,13 +445,11 @@ module pc110_chipset
 	logic [7:0] ata_status_reads;
 	logic [7:0] ata_last_status = 8'hDE;
 	logic [7:0] ata_last_err = 8'hDE;
+	logic [7:0] kbc_last_status = 8'hDE;   // diagnostic: 8042 status (64h) last value
 	logic [6:0] cmos_sel;
+	logic       io_write_d;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
-		if(reset) vstat_flip <= 1'b0;
-		else if(io_read && !io_read_d &&
-		        (io_address == 16'h03DA || io_address == 16'h03BA))
-			vstat_flip <= ~vstat_flip;
 		if(reset) ata_status_reads <= 8'd0;
 		else if(io_read && !io_read_d && io_address == 16'h01F7)
 			ata_status_reads <= ata_status_reads + 1'd1;
@@ -428,17 +462,37 @@ module pc110_chipset
 
 	logic [15:0] plog_fifo [0:511];
 	logic  [8:0] plog_head, plog_tail;
-	logic        io_write_d;
+
+	// POST checkpoint tracking (port 190h).  The BIOS's EARLY keyboard test
+	// runs exactly between checkpoint 56h (F000:4FEC) and 5Ah (F000:4FF4).
+	// Its 6477h entry gate skips the whole test when 8042 status bit4 reads
+	// 0 (keyboard inhibited).  We assert kbd_hide during that window so the
+	// early test is skipped: its pass path ends in a stuck-key check that
+	// consults the system MCU through an SMI API (AX=5380h) - the result
+	// comes back in CPU registers rewritten by SMM, which ao486 does not
+	// implement, so the check would read the routine's own CL=ABh and log
+	// POST error 301 deterministically (nonzero error count -> I9990303 ->
+	// no disk boot).  The MAIN keyboard test (checkpoint 6Dh) runs with
+	// bit4=1 as before and fully passes, so the keyboard still works.
+	logic [7:0] ckpt_last;
+	assign kbd_hide  = (ckpt_last == 8'h56);
+	// Boot-decision window ONLY: 6Eh (pre-INT19, F000:52B5), 6Fh (INT19
+	// entry, 7DE4) and the boot-retry codes up to 7Fh.  POST also emits
+	// HIGH checkpoint values early (F0h-FAh, BEh/BFh during the memory
+	// phase), so a plain >= 6Eh comparison let an early CMOS 7Bh read
+	// consume the setup request tens of seconds before INT19 sampled it.
+	assign ckpt_boot = (ckpt_last >= 8'h6E) && (ckpt_last < 8'h80);
 
 	always_ff @(posedge clk) begin
 		io_write_d <= io_write;
 		if(reset) begin
 			plog_tail <= 9'd0;
+			ckpt_last <= 8'h00;
 		end
 		else if(io_write && !io_write_d) begin
 			case(io_address)
 				16'h03BC: begin plog_fifo[plog_tail] <= {8'h50, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'P' progress
-				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'E' failure hi
+				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; ckpt_last <= io_writedata; end // 'E' failure hi
 				16'h0191: begin plog_fifo[plog_tail] <= {8'h65, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'e' failure lo
 				// video BIOS progress: C&T extension index writes ('X') mean
 				// the 32 KiB runtime image decompressed and init body started
@@ -458,6 +512,12 @@ module pc110_chipset
 					plog_fifo[plog_tail] <= {{2'b10, eced_index}, io_writedata};
 					plog_tail <= plog_tail + 1'd1;
 				end
+				// 8042 keyboard conversation (diagnostic): keyboard-device
+				// command writes to 60h (tag 'W'=57h) and controller command
+				// writes to 64h (tag 'M'=4Dh), so the BIOS's exact 8042
+				// command stream is visible alongside the 60h read stream.
+				16'h0060: begin plog_fifo[plog_tail] <= {8'h57, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				16'h0064: begin plog_fifo[plog_tail] <= {8'h4D, io_writedata}; plog_tail <= plog_tail + 1'd1; end
 				default: ;
 			endcase
 		end
@@ -496,12 +556,28 @@ module pc110_chipset
 			plog_fifo[plog_tail] <= {8'h4B, io_snoop};
 			plog_tail <= plog_tail + 1'd1;
 		end
+		// 8042 status port 64h reads (tag 'S'), logged when the value
+		// changes: reconstructs the OBF/AUXOBF/IBF sequence the BIOS polls,
+		// so we can see whether OBF re-asserts for the identify's 2nd byte.
+		else if(io_read_d && !io_read && io_address == 16'h0064 &&
+		        io_snoop != kbc_last_status) begin
+			kbc_last_status <= io_snoop;
+			plog_fifo[plog_tail] <= {8'h53, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
 		// CMOS reads (port 71h) of the boot-order/diagnostic bytes: tag
-		// 'C'=0Eh diag, 'c'=1Dh order-lo, 'i'=1Eh order-hi, so we can see
-		// exactly what the INT19 boot-list builder reads
+		// 'C'=0Eh diag, 'c'=1Dh order-lo, 'i'=1Eh order-hi, plus 'B'=7Bh
+		// (the INT19 enter-setup flag read at F000:813E - the logged value
+		// shows whether the forced bit3 actually reached the BIOS)
 		else if(io_read_d && !io_read && io_address == 16'h0071 &&
-		        (cmos_sel == 7'h0E || cmos_sel == 7'h1D || cmos_sel == 7'h1E)) begin
-			plog_fifo[plog_tail] <= {(cmos_sel==7'h0E)?8'h43:(cmos_sel==7'h1D)?8'h63:8'h69, io_snoop};
+		        (cmos_sel == 7'h0E || cmos_sel == 7'h1D || cmos_sel == 7'h1E || cmos_sel == 7'h7B)) begin
+			plog_fifo[plog_tail] <= {(cmos_sel==7'h0E)?8'h43:(cmos_sel==7'h1D)?8'h63:(cmos_sel==7'h1E)?8'h69:8'h42, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		// EBDA POST-error-log writes (from the L2 snoop): the moment an
+		// error is recorded, in stream order with checkpoints and I/O
+		else if(errlog_wr) begin
+			plog_fifo[plog_tail] <= {errlog_tag, errlog_byte};
 			plog_tail <= plog_tail + 1'd1;
 		end
 	end
