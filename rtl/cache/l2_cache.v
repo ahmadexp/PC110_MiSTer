@@ -276,9 +276,21 @@ wire [29:0] pc110_rom_addr =
 wire [29:0] cpu_addr_m = pc110_fold ?
 	(pc110_rom_addr & ~30'h00000700) : pc110_rom_addr;
 
-wire ram_rgn = (CPU_ADDR < 30'h00100000) ||
+// CC000h-DBFFFh is open bus on the real PC110: the video option ROM
+// decode ends below CC000h and nothing occupies the D segment (the font
+// window sits at DE000h).  IBM's shipped CONFIG.SYS relies on that -
+// EMM386 puts its EMS page frame at CC00h and scans it for ROM/RAM
+// first.  Our ROMSET alias made the whole C segment readable (video
+// BIOS image bytes at CC000h-CFFFFh), so EMM386 warned "Option ROM or
+// RAM detected within page frame" and paused the boot.  Words 33000h-
+// 36FFFh = bytes CC000h-DBFFFh; the CE000h unlock window (shr_rgn)
+// stays mapped.
+wire pc110_ems_open = (CPU_ADDR[29:12] >= 18'h33) && (CPU_ADDR[29:12] <= 18'h36) &&
+	~shr_rgn;
+
+wire ram_rgn = (((CPU_ADDR < 30'h00100000) ||
 	((CPU_ADDR < 30'h00500000) && pc110_cfg_settled) ||
-	pc110_upper_rgn || pc110_font_rgn;
+	pc110_upper_rgn) && ~pc110_ems_open) || pc110_font_rgn;
 
 wire [7:0] be64 = CPU_ADDR[0] ? {CPU_BE, 4'h0} : {4'h0, CPU_BE};
 
