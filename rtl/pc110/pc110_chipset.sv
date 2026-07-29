@@ -76,7 +76,6 @@ module pc110_chipset
 	logic [7:0] pos [0:7];
 	logic [7:0] xr [0:127];
 	logic [6:0] xr_index;
-	logic       vstat_flip;
 
 	logic [6:0] scamp_index;
 	logic [7:0] block2_index;
@@ -307,12 +306,16 @@ module pc110_chipset
 				io_readdata = (planar_setup == 8'hDF) ? pos[io_address[2:0]] : 8'hFF;
 			16'h03D6: io_readdata = {1'b0, xr_index};
 			16'h03D7: io_readdata = xr[xr_index];
-			// Input Status 1 shim: vertical-retrace bit 3 toggles on every
-			// read and display-enable bit 0 stays set, exactly the behavior
-			// the PC110-EMU oracle uses to satisfy the video BIOS retrace
-			// waits.  vga.v still sees the read for its flip-flop side
-			// effects; this only overrides the returned data.
-			16'h03DA, 16'h03BA: io_readdata = {4'h0, vstat_flip, 2'b00, 1'b1};
+			// Input Status 1 (3DAh/3BAh) is NO LONGER shimmed here: the
+			// former toggle-bit3/force-bit0 shim satisfied the video BIOS
+			// retrace waits during bring-up, but $DISP.SYS's adapter
+			// detection sets mode 12h and then spins with interrupts off
+			// until (3DA & 09h) == 0 (active display area) - a condition
+			// the shim could never produce, leaving the freshly-cleared
+			// mode-12h screen solid black.  The ao486 VGA free-runs and
+			// returns genuine {vretrace, display} status (vga.v drives the
+			// data when the chipset does not claim the address), which
+			// terminates every poll polarity with real frame timing.
 			16'h03E0: io_readdata = 8'hFF;
 			16'h03E1: io_readdata = pcic[pcic_index];
 			16'h1160: io_readdata = {1'b0, font_bank[6:0]};
@@ -433,10 +436,6 @@ module pc110_chipset
 	logic [6:0] cmos_sel;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
-		if(reset) vstat_flip <= 1'b0;
-		else if(io_read && !io_read_d &&
-		        (io_address == 16'h03DA || io_address == 16'h03BA))
-			vstat_flip <= ~vstat_flip;
 		if(reset) ata_status_reads <= 8'd0;
 		else if(io_read && !io_read_d && io_address == 16'h01F7)
 			ata_status_reads <= ata_status_reads + 1'd1;
