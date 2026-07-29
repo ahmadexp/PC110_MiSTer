@@ -7,6 +7,12 @@
 // PC110-EMU revisions.
 
 module pc110_chipset
+#(
+	// The byte-pair UART trace is useful during hardware bring-up, but its
+	// 512-entry FIFO is not part of the PC110 model. Keep it out of release
+	// builds unless explicitly enabled by a developer.
+	parameter POSTLOG_ENABLE = 1'b0
+)
 (
 	input  logic        clk,
 	input  logic        reset,
@@ -35,10 +41,7 @@ module pc110_chipset
 	// captured from live hardware.
 	output logic  [7:0] dram_cfg0,
 
-	// POST diagnostic logger: every write to the BIOS progress port
-	// (3BCh) and failure-code ports (190h/191h) is streamed out this
-	// UART line at 115200 baud as a tag byte ('P', 'E', 'e') followed
-	// by the code byte.  Idle high.
+	// Optional POST diagnostic UART. Idle high when POSTLOG_ENABLE is off.
 	output logic        postlog_tx,
 
 	// value returned on the shared I/O read bus, for the ATA trace
@@ -435,34 +438,6 @@ module pc110_chipset
 		end
 	end
 
-	// ------------------------------------------------------------------
-	// POST diagnostic logger.  Snoops writes to 3BCh/190h/191h (these
-	// remain outside io_cs so other decode is unaffected) into a small
-	// FIFO of {tag, code} pairs drained by a 115200-baud UART transmitter.
-
-	// Input Status 1 toggle: one flip per completed read of 3DAh/3BAh.
-	logic io_read_d;
-	logic [7:0] ata_status_reads;
-	logic [7:0] ata_last_status = 8'hDE;
-	logic [7:0] ata_last_err = 8'hDE;
-	logic [7:0] kbc_last_status = 8'hDE;   // diagnostic: 8042 status (64h) last value
-	logic [6:0] cmos_sel;
-	logic       io_write_d;
-	always_ff @(posedge clk) begin
-		io_read_d <= io_read;
-		if(reset) ata_status_reads <= 8'd0;
-		else if(io_read && !io_read_d && io_address == 16'h01F7)
-			ata_status_reads <= ata_status_reads + 1'd1;
-		// track the CMOS/RTC index the guest last selected via port 70h,
-		// so 71h reads can be attributed to a specific CMOS byte
-		if(reset) cmos_sel <= 7'd0;
-		else if(io_write && !io_write_d && io_address == 16'h0070)
-			cmos_sel <= io_writedata[6:0];
-	end
-
-	logic [15:0] plog_fifo [0:511];
-	logic  [8:0] plog_head, plog_tail;
-
 	// POST checkpoint tracking (port 190h).  The BIOS's EARLY keyboard test
 	// runs exactly between checkpoint 56h (F000:4FEC) and 5Ah (F000:4FF4).
 	// Its 6477h entry gate skips the whole test when 8042 status bit4 reads
@@ -483,16 +458,53 @@ module pc110_chipset
 	// consume the setup request tens of seconds before INT19 sampled it.
 	assign ckpt_boot = (ckpt_last >= 8'h6E) && (ckpt_last < 8'h80);
 
+	logic io_write_d;
 	always_ff @(posedge clk) begin
-		io_write_d <= io_write;
 		if(reset) begin
-			plog_tail <= 9'd0;
+			io_write_d <= 1'b0;
 			ckpt_last <= 8'h00;
 		end
-		else if(io_write && !io_write_d) begin
+		else begin
+			io_write_d <= io_write;
+			if(io_write && !io_write_d && io_address == 16'h0190)
+				ckpt_last <= io_writedata;
+		end
+	end
+
+	// ------------------------------------------------------------------
+	// Optional hardware bring-up trace. Snoops BIOS, ATA, keyboard, CMOS,
+	// and EBDA activity into a small FIFO drained at 115200 baud.
+	generate if(POSTLOG_ENABLE) begin : g_postlog
+		logic       io_read_d;
+		logic [7:0] ata_status_reads;
+		logic [7:0] ata_last_status = 8'hDE;
+		logic [7:0] ata_last_err = 8'hDE;
+		logic [7:0] kbc_last_status = 8'hDE;
+		logic [6:0] cmos_sel;
+		logic [15:0] plog_fifo [0:511];
+		logic  [8:0] plog_head, plog_tail;
+
+		always_ff @(posedge clk) begin
+			io_read_d <= io_read;
+			if(reset) begin
+				ata_status_reads <= 8'd0;
+				cmos_sel <= 7'd0;
+			end
+			else begin
+				if(io_read && !io_read_d && io_address == 16'h01F7)
+					ata_status_reads <= ata_status_reads + 1'd1;
+				if(io_write && !io_write_d && io_address == 16'h0070)
+					cmos_sel <= io_writedata[6:0];
+			end
+		end
+
+		always_ff @(posedge clk) begin
+			if(reset)
+				plog_tail <= 9'd0;
+			else if(io_write && !io_write_d) begin
 			case(io_address)
 				16'h03BC: begin plog_fifo[plog_tail] <= {8'h50, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'P' progress
-				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; ckpt_last <= io_writedata; end // 'E' failure hi
+				16'h0190: begin plog_fifo[plog_tail] <= {8'h45, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'E' failure hi
 				16'h0191: begin plog_fifo[plog_tail] <= {8'h65, io_writedata}; plog_tail <= plog_tail + 1'd1; end // 'e' failure lo
 				// video BIOS progress: C&T extension index writes ('X') mean
 				// the 32 KiB runtime image decompressed and init body started
@@ -580,47 +592,52 @@ module pc110_chipset
 			plog_fifo[plog_tail] <= {errlog_tag, errlog_byte};
 			plog_tail <= plog_tail + 1'd1;
 		end
-	end
-
-	logic [9:0]  plog_div;
-	logic [3:0]  plog_bit;
-	logic [9:0]  plog_shift;
-	logic        plog_second;   // sending the code byte of the pair
-	logic [7:0]  plog_code;
-
-	always_ff @(posedge clk) begin
-		if(reset) begin
-			plog_head   <= 9'd0;
-			plog_bit    <= 4'd0;
-			plog_div    <= 10'd0;
-			plog_second <= 1'b0;
-			postlog_tx  <= 1'b1;
 		end
-		else if(plog_bit == 4'd0) begin
-			postlog_tx <= 1'b1;
-			if(plog_head != plog_tail || plog_second) begin
-				if(plog_second) begin
-					plog_shift <= {1'b1, plog_code, 1'b0};
-				end
-				else begin
-					plog_shift <= {1'b1, plog_fifo[plog_head][15:8], 1'b0};
-					plog_code  <= plog_fifo[plog_head][7:0];
-					plog_head  <= plog_head + 1'd1;
-				end
-				plog_second <= ~plog_second;
-				plog_bit    <= 4'd10;
+
+		logic [9:0]  plog_div;
+		logic [3:0]  plog_bit;
+		logic [9:0]  plog_shift;
+		logic        plog_second;
+		logic [7:0]  plog_code;
+
+		always_ff @(posedge clk) begin
+			if(reset) begin
+				plog_head   <= 9'd0;
+				plog_bit    <= 4'd0;
 				plog_div    <= 10'd0;
+				plog_second <= 1'b0;
+				postlog_tx  <= 1'b1;
 			end
-		end
-		else begin
-			postlog_tx <= plog_shift[0];
-			if(plog_div == POSTLOG_DIV[9:0] - 10'd1) begin
-				plog_div   <= 10'd0;
-				plog_shift <= {1'b1, plog_shift[9:1]};
-				plog_bit   <= plog_bit - 4'd1;
+			else if(plog_bit == 4'd0) begin
+				postlog_tx <= 1'b1;
+				if(plog_head != plog_tail || plog_second) begin
+					if(plog_second) begin
+						plog_shift <= {1'b1, plog_code, 1'b0};
+					end
+					else begin
+						plog_shift <= {1'b1, plog_fifo[plog_head][15:8], 1'b0};
+						plog_code  <= plog_fifo[plog_head][7:0];
+						plog_head  <= plog_head + 1'd1;
+					end
+					plog_second <= ~plog_second;
+					plog_bit    <= 4'd10;
+					plog_div    <= 10'd0;
+				end
 			end
-			else plog_div <= plog_div + 10'd1;
+			else begin
+				postlog_tx <= plog_shift[0];
+				if(plog_div == POSTLOG_DIV[9:0] - 10'd1) begin
+					plog_div   <= 10'd0;
+					plog_shift <= {1'b1, plog_shift[9:1]};
+					plog_bit   <= plog_bit - 4'd1;
+				end
+				else plog_div <= plog_div + 10'd1;
+			end
 		end
 	end
+	else begin : g_no_postlog
+		assign postlog_tx = 1'b1;
+	end
+	endgenerate
 
 endmodule

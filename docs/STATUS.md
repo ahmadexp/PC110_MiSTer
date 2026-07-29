@@ -171,7 +171,8 @@ to the validated IBM image:
 
 MiSTer Main actually executes the split `boot0.rom`/`boot1.rom`, so these are
 generated from the patched copy as well as `pc110_bios.bin`. On unit
-`192.168.1.74`, the serial trace showed `ECED[11]=00h` and `ECED[12]=00h`,
+On the primary test MiSTer, the serial trace showed `ECED[11]=00h` and
+`ECED[12]=00h`,
 followed by their restoration. The real IBM Easy-Setup home page appeared,
 and Right Arrow moved selection from Config to Date/Time.
 
@@ -198,25 +199,28 @@ Hardware evidence:
   `b06ef449802ad310fcbf17aa5aa2df2677d394ab01a09cfb3d815f095a2a7aca`
 - patched PersonaWare VHD SHA-256:
   `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
-- standalone-profile RBF SHA-256:
-  `d806207a8f4affc7e567191b43f29733f17b3f48bc887d27ebf7c37c187b0bb6`
+- release RBF SHA-256:
+  `aa0ed49ef09e1d6745e595034064f3f780c891f2a225de6867e1c202f412253e`
+- full Quartus timing build: worst setup slack `+0.410 ns`, worst hold slack
+  `+0.245 ns`, and zero TNS in every reported domain
 - current patched Main SHA-256:
   `b784bf841164c7254da6b7ac0de0964a9d113f7e28ea76318d25df0edc8a6398`
-- 29 July 2026 hardware verification on `192.168.10.251` and
-  `192.168.1.74`: both reported `CORE=PC110`, EBDA error count/code
-  `00h/0000h`, and booted PersonaWare with working storage and video
+- 29 July 2026 hardware verification on two DE10-Nano MiSTer systems: both
+  reported `CORE=PC110`, EBDA error count/code `00h/0000h`, and booted
+  PersonaWare with working storage and video
+- current MiSTer framework release verified on both boards: each on-device RBF
+  matched the release SHA, reported `CORE=PC110`, and reached PersonaWare at
+  native 640x480
+- a PID change after `/dev/MiSTer_cmd` `load_core` is expected: current Main
+  deliberately restarts itself after loading any RBF via `app_restart()`
 
 Known follow-ups:
 
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
-- MiSTer Main crashes and respawns once on `load_core` while the PC110 core
-  runs (FPGA keeps running; automation must timeout FIFO writes); this persists
-  with current upstream Main plus the separated PC110 profile and still needs
-  investigation
 - RAM-size OSD menu (4/8/12/20 MB) still to be added
-- the EBDA errlog snoop and 8042/CMOS trace tags are debug aids; strip or
-  gate them for a release build
+- the optional POST UART trace is disabled in release builds; enable the
+  chipset's `POSTLOG_ENABLE` parameter only for hardware bring-up
 
 Hardware smoke tests should record:
 
@@ -224,4 +228,5 @@ Hardware smoke tests should record:
 - MiSTer Main version
 - `/tmp/CORENAME`
 - installed ROM sizes and hashes
-- serial POST trace (`cap.sh`), EBDA error count/code, and a screenshot
+- EBDA error count/code and a native MiSTer screenshot
+- for diagnostic builds only, the serial POST trace

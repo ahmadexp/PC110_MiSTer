@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mister_host="${MISTER_HOST:-root@192.168.1.74}"
+mister_host="${MISTER_HOST:-root@mister.local}"
 rbf_path="${repo_dir}/artifacts/PC110.rbf"
 rom_dir="${repo_dir}/artifacts/roms"
 stamp="$(date +%Y%m%d-%H%M%S)"

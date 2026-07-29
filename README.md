@@ -10,11 +10,11 @@ project identity, machine profile, chipset behavior, storage policy,
 configuration and release artifact are PC110-specific. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the dependency boundary.
 
-This is an engineering core, not yet a cycle-exact replacement for the whole
-PC110 planar.  The current milestone gets the real 256 KiB IBM flash image in
-front of a 486 CPU and implements enough of the board-specific decode to begin
-real POST on hardware.  See [docs/STATUS.md](docs/STATUS.md) for the measured
-and placeholder parts.
+This is a functional beta, not yet a cycle-exact replacement for every device
+on the PC110 planar. The current implementation completes the original IBM
+BIOS POST, runs IBM Easy-Setup, and boots PC DOS J7.0/V into PersonaWare on
+MiSTer hardware. See [docs/STATUS.md](docs/STATUS.md) for measured behavior and
+remaining device-level work.
 
 ## What is implemented
 
@@ -96,12 +96,26 @@ scripts/build.sh
 Override `DOCKER_BIN`, `DOCKER_CONTEXT`, or `QUARTUS_IMAGE` if necessary.
 The final bitstream is copied to `artifacts/PC110.rbf`.
 
+## Release artifact
+
+The current hardware-tested bitstream is
+[`releases/PC110_20260729.rbf`](releases/PC110_20260729.rbf), with SHA-256
+`aa0ed49ef09e1d6745e595034064f3f780c891f2a225de6867e1c202f412253e`.
+Future releases follow the `PC110_YYYYMMDD.rbf` convention. Copy the RBF to
+`/media/fat/_Computer`; it may be renamed
+`IBM PC110_YYYYMMDD.rbf` so the full machine name appears in MiSTer's core
+browser. The internal core identifier remains `PC110`.
+
+The release contains no IBM firmware or disk image. Prepare the ROMs as
+described above and place `pc110_bios.bin` (and optionally
+`pc110_font.bin`) in `/media/fat/games/PC110`.
+
 ## Install
 
 With key-based SSH access to a MiSTer:
 
 ```sh
-MISTER_HOST=root@192.168.1.74 scripts/deploy-mister.sh
+MISTER_HOST=root@mister.local scripts/deploy-mister.sh
 ```
 
 The script installs a timestamped RBF in `/media/fat/_Computer`, stages all
@@ -118,7 +132,8 @@ MiSTer Main currently activates its shared x86 services (IDE image mounting,
 CMOS and boot-ROM loading) from a machine table. The reviewable series in
 `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`, makes explicit
 machine geometry authoritative, and completes the generic ATA commands used by
-the IBM BIOS.
+the IBM BIOS. That integration is proposed upstream in
+[MiSTer-devel/Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252).
 
 Apply the series to a clean current Main checkout, then build it with the
 official toolchain container:
@@ -164,6 +179,7 @@ PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 
 - `PC110.sv` — MiSTer top level and PC110 configuration string
 - `docs/ARCHITECTURE.md` — standalone-core and reused-IP boundary
+- `docs/SUBMISSION.md` — official-core readiness and integration record
 - `rtl/pc110/pc110_chipset.sv` — board-specific I/O and shadow registers
 - `rtl/pc110/pc110_host_bridge.v` — shared x86 service transport
 - `rtl/cache/l2_cache.v` — 20 MiB boundary, upper-memory write protection,
@@ -176,5 +192,7 @@ PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 
 Some CPU and platform RTL derives from
 an [upstream 486 project](https://github.com/alfikpl/ao486). It remains under
-its original license and attribution; see [LICENSE](LICENSE) and source-file
-headers. No IBM firmware is included.
+its original license and attribution. The combined core is distributed under
+GPL-3.0-or-later; component files retain their compatible upstream terms. See
+[LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and
+source-file headers. No IBM firmware is included.
