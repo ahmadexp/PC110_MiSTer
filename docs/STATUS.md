@@ -157,13 +157,51 @@ Both test units run the same full-effort build (worst slack -0.233 ns).
 Unit 2's black graphics screen was an OLD patched-Main binary, not the
 core - Main is synced between units now (backup MiSTer.bak-20260729).
 
+## Final setup and boot polish (2026-07-28, hardware verified)
+
+**IBM Easy-Setup is interactive.** The setup request already reached the INT19
+decision (`CMOS 7Bh = 0Ah` once, then `02h` after one-shot consumption), but
+two firmware paths still depended on PC110 system-management behavior absent
+from ao486. `scripts/prepare-roms.sh` now applies two size-preserving patches
+to the validated IBM image:
+
+- `F000:8145` changes `jnz 815Bh` to `jnz 817Ch`, routing CMOS bit 3 directly
+  to the existing Easy-Setup loader
+- the relocated stub at `F000:DDE6` replaces its initial
+  `INT 15h AX=5380h` unlock with the equivalent direct `out 00FBh,80h`
+
+MiSTer Main actually executes the split `boot0.rom`/`boot1.rom`, so these are
+generated from the patched copy as well as `pc110_bios.bin`. On unit
+`192.168.1.74`, the serial trace showed `ECED[11]=00h` and `ECED[12]=00h`,
+followed by their restoration. The real IBM Easy-Setup home page appeared,
+and Right Arrow moved selection from Config to Date/Time.
+
+**The EMM386 keypress pause is gone.** Open-bus data (`FFh`) still looks like
+ROM to EMM386, so the earlier CC000h-DBFFFh experiment could not solve the
+warning. The PersonaWare disk now uses:
+
+```text
+DEVICE=C:\DOS\EMM386.EXE NOEMS
+```
+
+The original disk is retained on the test unit as
+`Personaware-disk.pre-noems.vhd`. An unattended cold boot reached PersonaWare
+in under 30 seconds with EBDA POST error count/code `00h/0000h`; DOS/V,
+Japanese fonts, UMB-loaded drivers, keyboard, and the desktop remained
+functional. `scripts/patch-personaware-noems.sh` makes the disk edit
+reproducible and creates a backup before writing.
+
+Hardware evidence:
+
+- prepared BIOS SHA-256:
+  `e906af0cb235ef490b9d5d24eab300bcf865bd112dd8a096bdf1890816933eaa`
+- patched boot0 SHA-256:
+  `b06ef449802ad310fcbf17aa5aa2df2677d394ab01a09cfb3d815f095a2a7aca`
+- patched PersonaWare VHD SHA-256:
+  `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
+
 Known follow-ups:
 
-- Easy-Setup UI: flash-window remap + unlock built, hardware verification
-  pending (setup currently reaches the I9990303 gateway; the icon screen's
-  int16 loop treats any key as "retry boot", NOT as setup entry)
-- EMM386 warns "Option ROM or RAM detected within page frame" and pauses:
-  fixed by open-bussing CC000h-DBFFFh (commit 91d00d0), build pending
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
 - MiSTer Main crashes and respawns on load_core while the PC110 core runs

@@ -447,6 +447,7 @@ module pc110_chipset
 	logic [7:0] ata_last_err = 8'hDE;
 	logic [7:0] kbc_last_status = 8'hDE;   // diagnostic: 8042 status (64h) last value
 	logic [6:0] cmos_sel;
+	logic       io_write_d;
 	always_ff @(posedge clk) begin
 		io_read_d <= io_read;
 		if(reset) ata_status_reads <= 8'd0;
@@ -461,7 +462,6 @@ module pc110_chipset
 
 	logic [15:0] plog_fifo [0:511];
 	logic  [8:0] plog_head, plog_tail;
-	logic        io_write_d;
 
 	// POST checkpoint tracking (port 190h).  The BIOS's EARLY keyboard test
 	// runs exactly between checkpoint 56h (F000:4FEC) and 5Ah (F000:4FF4).
