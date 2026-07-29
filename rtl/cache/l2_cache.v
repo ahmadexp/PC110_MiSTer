@@ -64,7 +64,12 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// visible in the serial trace, interleaved with checkpoints and I/O.
 	output reg        PC110_ERRLOG_WR,
 	output reg  [7:0] PC110_ERRLOG_TAG,
-	output reg  [7:0] PC110_ERRLOG_BYTE
+	output reg  [7:0] PC110_ERRLOG_BYTE,
+
+	// while high (Easy-Setup loader window, see pc110_chipset.sv), reads
+	// of E0000h-FFFFFh alias to C0000h-DFFFFh - the DDR copy of the
+	// flash's lower 128 KiB, which holds the Easy-Setup module.
+	input             PC110_EASYSETUP
 );
    
 
@@ -259,8 +264,15 @@ wire pc110_fold = ~pc110_cfg_settled && (CPU_ADDR < 30'h00028000);
 wire pc110_vga_rom_alias =
 	(PC110_ROMSET == 8'h19) &&
 	(CPU_ADDR[ADDRBITS+1:14] == 'hC);
+// Easy-Setup loader window: E0000h-FFFFFh (words 38000h-3FFFFh) fetch the
+// flash's lower 128 KiB, whose DDR copy sits at guest C0000h-DFFFFh
+// (-8000h words).  That copy is pristine: C-segment writes alias away
+// (pc110_vga_rom_alias) and nothing writes the D segment.
+wire pc110_easysetup_alias = PC110_EASYSETUP &&
+	(CPU_ADDR[29:15] == 15'h7);
 wire [29:0] pc110_rom_addr =
-	pc110_vga_rom_alias ? (CPU_ADDR + 30'h00008000) : CPU_ADDR;
+	pc110_easysetup_alias ? (CPU_ADDR - 30'h00008000) :
+	pc110_vga_rom_alias   ? (CPU_ADDR + 30'h00008000) : CPU_ADDR;
 wire [29:0] cpu_addr_m = pc110_fold ?
 	(pc110_rom_addr & ~30'h00000700) : pc110_rom_addr;
 

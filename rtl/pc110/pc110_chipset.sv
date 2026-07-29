@@ -62,7 +62,18 @@ module pc110_chipset
 	// asserted once POST reaches the boot phase (checkpoint 6Eh onward):
 	// gates the CMOS-7Bh setup-request acknowledge so only the INT19
 	// boot-decision read consumes the request.
-	output logic        ckpt_boot
+	output logic        ckpt_boot,
+
+	// asserted while the BIOS's Easy-Setup loader stub (F000:DDE6,
+	// relocated to 3000:0000) holds the flash window open: it zeroes the
+	// E/F-segment shadow read-enables (eced 11h/12h) AND toggles planar
+	// control (port 98h) bit2, then block-copies E0000h-FFFFFh expecting
+	// the LOWER 128 KiB of flash (the Easy-Setup module) there.  The L2
+	// aliases those reads to the module's DDR copy while this is high.
+	// planar_control bit2 is the disambiguator: POST also zeroes eced
+	// 11h/12h transiently during shadow configuration, but never with
+	// bit2 set.
+	output logic        easysetup_remap
 );
 
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
@@ -99,6 +110,8 @@ module pc110_chipset
 	assign font_window_segment = font_segment;
 	assign font_window_enable = font_enable;
 	assign dram_cfg0 = eced[8'h02];
+	assign easysetup_remap = (eced[8'h11] == 8'h00) && (eced[8'h12] == 8'h00) &&
+	                         planar_control[2];
 
 	integer i;
 	initial begin

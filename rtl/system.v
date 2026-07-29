@@ -236,6 +236,7 @@ wire [7:0] pc110_errlog_tag;
 wire [7:0] pc110_errlog_byte;
 wire       pc110_kbd_hide;
 wire       pc110_ckpt_boot;
+wire       pc110_easysetup_remap;
 wire       rtc_setup_ack;
 // only the INT19 boot-decision read (checkpoint 6Eh onward) consumes the
 // setup request; earlier incidental CMOS 7Bh reads must not.
@@ -251,6 +252,7 @@ l2_cache cache
 	.PC110_ERRLOG_WR   (pc110_errlog_wr),
 	.PC110_ERRLOG_TAG  (pc110_errlog_tag),
 	.PC110_ERRLOG_BYTE (pc110_errlog_byte),
+	.PC110_EASYSETUP   (pc110_easysetup_remap),
 
 	.CPU_ADDR          (mem_address),
 	.CPU_DIN           (mem_writedata),
@@ -434,7 +436,8 @@ pc110_chipset pc110
 	.errlog_tag          (pc110_errlog_tag),
 	.errlog_byte         (pc110_errlog_byte),
 	.kbd_hide            (pc110_kbd_hide),
-	.ckpt_boot           (pc110_ckpt_boot)
+	.ckpt_boot           (pc110_ckpt_boot),
+	.easysetup_remap     (pc110_easysetup_remap)
 );
 
 iobus iobus
