@@ -13,3 +13,5 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y iverilog
       - name: Run PC110 chipset testbench
         run: ./scripts/test.sh
+      - name: Check MiSTer submission layout
+        run: ./scripts/check-release.sh

@@ -5,9 +5,9 @@
 # translation, many more cores).
 #
 # Usage: scripts/build-remote.sh
-# Env:   BUILD_HOST (default user@192.168.1.169), BUILD_DIR (default
-#        ~/PC110-Mister), QUARTUS_IMAGE
-#        FAST=1  drop the inherited ao486 timing-closure effort (physical
+# Env:   BUILD_HOST (required, for example user@quartus-builder.local),
+#        BUILD_DIR (default ~/PC110-Mister), QUARTUS_IMAGE
+#        FAST=1  drop the inherited timing-closure effort (physical
 #                synthesis, final placement optimization, ECO timing) and
 #                use the fast fitter.  Cuts fit time substantially for the
 #                functional-debug loop.  The CPU clock already misses
@@ -19,10 +19,15 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-build_host="${BUILD_HOST:-user@192.168.1.169}"
+build_host="${BUILD_HOST:-}"
 build_dir="${BUILD_DIR:-PC110-Mister}"
 quartus_image="${QUARTUS_IMAGE:-ghcr.io/raetro/quartus:mister}"
 fast="${FAST:-0}"
+
+if [[ -z "${build_host}" ]]; then
+  echo "error: set BUILD_HOST to an SSH-accessible x86-64 build host" >&2
+  exit 2
+fi
 
 # Sources only: the project files, RTL, and sim.  Build products, vendor
 # trees, and the unrelated Personaware-EN repository stay local.

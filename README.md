@@ -4,21 +4,22 @@
 ![Quartus](https://img.shields.io/badge/Quartus-17.0.2-blue)
 ![Target](https://img.shields.io/badge/target-DE10--Nano%20%2F%20MiSTer-orange)
 
-This repository is an FPGA bring-up of the IBM Palm Top PC 110, built on the
-MiSTer ao486 core.  It is deliberately based on the 26 March 2022 ao486 source
-(`1c5cbe5301f2ba87e6db6e3de52dc7536a1eac35`) so that the resulting RBF remains
-compatible with the older MiSTer Main binary on the development machine.
+This repository is a standalone MiSTer core for the IBM Palm Top PC 110. It
+uses an open-source 486SX-compatible CPU and reusable PC components, while the
+project identity, machine profile, chipset behavior, storage policy,
+configuration and release artifact are PC110-specific. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the dependency boundary.
 
-This is an engineering core, not yet a cycle-exact replacement for the whole
-PC110 planar.  The current milestone gets the real 256 KiB IBM flash image in
-front of a 486 CPU and implements enough of the board-specific decode to begin
-real POST on hardware.  See [docs/STATUS.md](docs/STATUS.md) for the measured
-and placeholder parts.
+This is a functional beta, not yet a cycle-exact replacement for every device
+on the PC110 planar. The current implementation completes the original IBM
+BIOS POST, runs IBM Easy-Setup, and boots PC DOS J7.0/V into PersonaWare on
+MiSTer hardware. See [docs/STATUS.md](docs/STATUS.md) for measured behavior and
+remaining device-level work.
 
 ## What is implemented
 
-- ao486 486-class CPU, AT peripherals, IDE, floppy, VGA, keyboard, and mouse
-- a forced 30 MHz ao486 CPU profile, immune to stale AO486 overclock settings
+- 486SX-compatible CPU, AT peripherals, IDE, floppy, VGA, keyboard, and mouse
+- a fixed 30 MHz CPU profile, the closest currently characterized PC110 timing
 - PC110 memory geometry: 4 MiB planar RAM plus the 16 MiB expansion card
 - the 256 KiB PC110 flash mapped linearly at `C0000h-FFFFFh`
 - VL82C420/SCAMP configuration interfaces at `22h/23h`, `24h/25h`,
@@ -84,8 +85,8 @@ port write. The original input ROM is never modified.
 
 ## Build
 
-MiSTer documents Quartus 17.0.2 as the supported toolchain.  The included
-script uses the ao486 project's reproducible Quartus container:
+MiSTer documents Quartus 17.0.2 as the supported toolchain. The included
+script uses a reproducible MiSTer Quartus container:
 
 ```sh
 scripts/test.sh
@@ -95,12 +96,26 @@ scripts/build.sh
 Override `DOCKER_BIN`, `DOCKER_CONTEXT`, or `QUARTUS_IMAGE` if necessary.
 The final bitstream is copied to `artifacts/PC110.rbf`.
 
+## Release artifact
+
+The current hardware-tested bitstream is
+[`releases/PC110_20260729.rbf`](releases/PC110_20260729.rbf), with SHA-256
+`aa0ed49ef09e1d6745e595034064f3f780c891f2a225de6867e1c202f412253e`.
+Future releases follow the `PC110_YYYYMMDD.rbf` convention. Copy the RBF to
+`/media/fat/_Computer`; it may be renamed
+`IBM PC110_YYYYMMDD.rbf` so the full machine name appears in MiSTer's core
+browser. The internal core identifier remains `PC110`.
+
+The release contains no IBM firmware or disk image. Prepare the ROMs as
+described above and place `pc110_bios.bin` (and optionally
+`pc110_font.bin`) in `/media/fat/games/PC110`.
+
 ## Install
 
 With key-based SSH access to a MiSTer:
 
 ```sh
-MISTER_HOST=root@192.168.1.74 scripts/deploy-mister.sh
+MISTER_HOST=root@mister.local scripts/deploy-mister.sh
 ```
 
 The script installs a timestamped RBF in `/media/fat/_Computer`, stages all
@@ -113,15 +128,24 @@ The deployed bitstream is named `IBM PC110_<timestamp>.rbf`, so MiSTer's core
 browser shows the full machine name while the internal `PC110` identifier
 continues to select the existing x86 support and configuration paths.
 
-MiSTer Main activates its x86 support (IDE image mounting, CMOS) by core
-name, and stock Main only recognizes `AO486`.  This repository therefore
-carries a one-line patch in `upstream-main/user_io.cpp` that adds `PC110` to
-Main's `is_x86()` check.  Build the patched Main with the official toolchain
-container and install it alongside the core:
+MiSTer Main currently activates its shared x86 services (IDE image mounting,
+CMOS and boot-ROM loading) from a machine table. The reviewable series in
+`scripts/main-patches` adds a distinct `X86_PROFILE_PC110`, makes explicit
+machine geometry authoritative, and completes the generic ATA commands used by
+the IBM BIOS. That integration is proposed upstream in
+[MiSTer-devel/Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252).
+
+Apply the series to a clean current Main checkout, then build it with the
+official toolchain container:
 
 ```sh
-docker run --rm -v "$PWD/upstream-main:/mister" -w /mister \
-  misterkun/toolchain make
+scripts/apply-main-patches.sh /path/to/Main_MiSTer
+
+docker run --rm --platform linux/arm \
+  -v "/path/to/Main_MiSTer:/mister" -w /mister \
+  misterkun/toolchain sh -lc \
+  "make BASE=arm-linux-gnueabihf \
+    CC='arm-linux-gnueabihf-gcc -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard'"
 ```
 
 The complete flash load is not redundant.  Main's normal `boot1.rom` path
@@ -142,7 +166,7 @@ The helper creates a `.pre-noems` backup before changing `CONFIG.SYS`.
 ## Using the core
 
 - Select the timestamped PC110 core in `_Computer`.
-- Press `Win+F12` for the ao486 OSD.
+- Press `Win+F12` for the PC110 OSD.
 - Mount a raw VHD at IDE 0-0 if the BIOS gets as far as boot selection.
 - Use Reset after changing storage.
 
@@ -154,7 +178,10 @@ PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 ## Source layout
 
 - `PC110.sv` — MiSTer top level and PC110 configuration string
+- `docs/ARCHITECTURE.md` — standalone-core and reused-IP boundary
+- `docs/SUBMISSION.md` — official-core readiness and integration record
 - `rtl/pc110/pc110_chipset.sv` — board-specific I/O and shadow registers
+- `rtl/pc110/pc110_host_bridge.v` — shared x86 service transport
 - `rtl/cache/l2_cache.v` — 20 MiB boundary, upper-memory write protection,
   and font-window remap
 - `rtl/soc/rtc.v` — PC110 CMOS translation
@@ -163,9 +190,9 @@ PersonaWare V1.0 desktop. Remaining device-level work is tracked in
 
 ## Provenance and licensing
 
-The base is
-[MiSTer-devel/ao486_MiSTer](https://github.com/MiSTer-devel/ao486_MiSTer),
-which in turn derives from
-[alfikpl/ao486](https://github.com/alfikpl/ao486).  The inherited RTL remains
-under its original licenses; see [LICENSE](LICENSE) and source-file headers.
-No IBM firmware is included.
+Some CPU and platform RTL derives from
+an [upstream 486 project](https://github.com/alfikpl/ao486). It remains under
+its original license and attribution. The combined core is distributed under
+GPL-3.0-or-later; component files retain their compatible upstream terms. See
+[LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and
+source-file headers. No IBM firmware is included.

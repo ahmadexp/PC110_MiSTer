@@ -130,8 +130,7 @@ wire [7:0] io_readdata_next =
     // extended-CMOS checksum block.  POST's 184 check (F000:8FDF) sums
     // B8h..BEh, stopping at the first zero: an empty block (B8h==0) is
     // skipped.  Return 0 for 38h/3Fh so no 184 error is logged (a logged
-    // error blocks disk boot).  The ao486 boot-config aliases are unused on
-    // PC110.
+    // error blocks disk boot). The generic boot-config aliases are unused.
     (ram_address == 7'h38) ? 8'h00 :
     (ram_address == 7'h3D) ? 8'h00 :
     (ram_address == 7'h3F) ? 8'h00 :
@@ -139,7 +138,7 @@ wire [7:0] io_readdata_next =
     (ram_address == 7'h37) ? rtc_century :
     // CMOS 7Bh bit3 = "enter setup on this boot".  The INT19 boot decision
     // (F000:8143) tests it right before its F1 check; the F1 check itself
-    // reads the system MCU through an SMI service ao486 cannot provide, so
+    // reads the system MCU through an SMI service this CPU cannot provide, so
     // this bit is the only workable Easy-Setup entry.  setup_req is held by
     // the OSD "Enter BIOS Setup" action (and by a real F1 press during
     // POST) and expires on its own.
@@ -528,7 +527,7 @@ end
 
 //------------------------------------------------------------------------------
 
-// MiSTer Main initializes an ao486-compatible generic CMOS.  Translate the
+// MiSTer Main initializes a generic PC-compatible CMOS. Translate the
 // machine-specific fields as they cross the management port so the IBM BIOS
 // sees the real PC110 equipment and 20 MiB memory geometry.  Recompute the
 // standard 10h..2Dh checksum over the translated values.

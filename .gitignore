@@ -8,6 +8,7 @@ artifacts
 roms
 *.rom
 *.rbf
+!releases/*.rbf
 upstream-ao486/
 upstream-main/
 .DS_Store

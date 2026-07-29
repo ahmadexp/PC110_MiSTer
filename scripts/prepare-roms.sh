@@ -48,7 +48,8 @@ cp "${bios_path}" "${out_dir}/pc110_bios.bin"
 # the supplied IBM image remains untouched.
 #
 # F000:8145 normally sends CMOS-7B setup requests through a second gate that
-# depends on the PC110 system-management controller. ao486 has no SMM, so route
+# depends on the PC110 system-management controller. The CPU core has no SMM,
+# so route
 # a set bit directly to the existing Easy-Setup loader at F000:817C.
 branch_bytes="$(od -An -tx1 -j $((0x38145)) -N 2 "${out_dir}/pc110_bios.bin" | tr -d ' \n')"
 if [[ "${branch_bytes}" != "7514" ]]; then
@@ -59,7 +60,8 @@ printf '\x35' | dd of="${out_dir}/pc110_bios.bin" bs=1 seek=$((0x38146)) \
   conv=notrunc status=none
 
 # The relocated loader opens EC/ED through INT 15h AX=5380h, an SMM-era
-# indirection that does not reliably complete on ao486. Replace its first
+# indirection that does not reliably complete on the current platform. Replace
+# its first
 # eight bytes with an equivalent direct "out 00FBh,80h", which opens the
 # modeled VL82C420 configuration bank before indices 11h/12h are programmed.
 unlock_bytes="$(od -An -tx1 -j $((0x3DDE6)) -N 8 "${out_dir}/pc110_bios.bin" | tr -d ' \n')"

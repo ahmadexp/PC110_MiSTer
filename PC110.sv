@@ -29,7 +29,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [48:0] HPS_BUS,
+	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -52,10 +52,13 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output        VGA_DISABLE,
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
+	output        HDMI_BLACKOUT,
+	output        HDMI_BOB_DEINT,
 
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM
@@ -186,6 +189,9 @@ assign LED_POWER   = 0;
 // CMOS, and memory state that POST's shutdown tests rely on.
 assign BUTTONS     = 2'b00;
 assign HDMI_FREEZE = 0;
+assign HDMI_BLACKOUT = 0;
+assign HDMI_BOB_DEINT = 0;
+assign VGA_DISABLE = 0;
 
 led hdd_led(clk_sys, |mgmt_req[5:0], LED_DISK[0]);
 led fdd_led(clk_sys, |mgmt_req[7:6], LED_USER);
@@ -362,7 +368,7 @@ wire        mgmt_wr;
 wire  [7:0] mgmt_req;
 
 wire [35:0] EXT_BUS;
-hps_ext hps_ext
+pc110_host_bridge host_bridge
 (
 	.clk_sys(clk_sys),
 	.EXT_BUS(EXT_BUS),
@@ -436,9 +442,8 @@ pll_cfg pll_cfg
 	.reconfig_from_pll(reconfig_from_pll)
 );
 
-// The PC110 uses a 33 MHz 486SX.  ao486's closest characterized profile is
-// 30 MHz.  Force it here so a saved AO486 configuration cannot accidentally
-// select the inherited 56/90/100 MHz overclock profiles during PC110 POST.
+// The PC110 uses a 33 MHz 486SX. The closest characterized soft-CPU profile is
+// 30 MHz, so keep it fixed rather than exposing unverified overclock profiles.
 wire [2:0] clk_req = 3'd2;
 
 reg [2:0] speed;
@@ -839,8 +844,8 @@ wire       ps2_reset_n;
 wire       bios_setup_ack;
 
 // The PC110 has 4 MB onboard plus the 16 MB expansion card.  The memory
-// controller enforces the 20 MB boundary; select ao486's smaller host profile
-// here so the old Main binary never advertises 256 MB in its initial CMOS.
+// controller enforces the 20 MB boundary; select the smaller host profile so
+// older Main binaries never advertise 256 MB in their initial CMOS.
 reg memcfg = 1;
 always @(posedge clk_sys) if(reset) memcfg <= 1;
 
@@ -848,7 +853,8 @@ always @(posedge clk_sys) if(reset) memcfg <= 1;
 // Both pulse the core reset.  Easy-Setup entry does NOT work by injecting
 // an F1 scancode: the BIOS's setup gate (F000:8150 -> DF51) reads the
 // "currently held key" from the PC110 system MCU through an SMI service
-// that ao486 cannot provide - it never consults the 8042/INT16 path.  The
+// that the current CPU/platform cannot provide - it never consults the
+// 8042/INT16 path. The
 // same INT19 decision tests CMOS 7Bh bit3 first (F000:8143), so Enter
 // BIOS instead holds bios_setup_req, which forces that bit while POST
 // runs; INT19 then routes into the setup/config path with no keystroke.

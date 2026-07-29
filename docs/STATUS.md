@@ -20,7 +20,7 @@ Two important corrections follow from that rule:
 
 | Area | State | Notes |
 |---|---|---|
-| CPU | inherited | ao486 no-FPU core; PLL power-on and runtime selection are both forced to its 30 MHz profile, the closest characterized PC110 timing |
+| CPU | inherited | 486SX-compatible no-FPU core; PLL power-on and runtime selection are fixed at 30 MHz, the closest characterized PC110 timing |
 | RAM | implemented | 20 MiB CPU-visible boundary |
 | BIOS flash | implemented for bring-up | complete 256 KiB image at `C0000h-FFFFFh`; shadow RAM currently shares the same DDR backing |
 | VL82C420 gates | implemented | observed SCAMP, block-2, and EC/ED unlock sequences |
@@ -30,9 +30,9 @@ Two important corrections follow from that rule:
 | font ROM | implemented | 1 MiB DDR image, banked 8 KiB window |
 | inking | minimal | idle/status behavior needed for enumeration only |
 | EC-A / EC-B | captured defaults | not a functional power-management microcontroller |
-| VGA | inherited placeholder | ao486 VGA, not yet C&T F65535 register-accurate |
-| audio | inherited placeholder | ao486 SB/OPL path, not yet an ES488 DSP-2.01 identity |
-| storage | inherited | ao486 IDE/floppy path; PC110 BIOS compatibility still to be proven |
+| VGA | inherited placeholder | PC-compatible VGA, not yet C&T F65535 register-accurate |
+| audio | inherited placeholder | SB/OPL-compatible path, not yet an ES488 DSP-2.01 identity |
+| storage | inherited | PC-compatible IDE/floppy path; PC110 BIOS compatibility still to be proven |
 
 ## Known architectural debt
 
@@ -47,21 +47,19 @@ Two important corrections follow from that rule:
 5. PCMCIA windows, card insertion, interrupts, and DMA are not connected.
 6. ES488 mixer/DSP identification and exact IRQ/DMA behavior remain to be
    added on top of the inherited sound path.
-7. The forced ao486 30 MHz profile is the closest currently available setting; a
+7. The fixed 30 MHz profile is the closest currently available setting; a
    separately verified 33.333 MHz CPU/timer profile remains future work.
 
 ## Core identity and Main support
 
-The core identifies itself as `PC110`.  MiSTer Main gates its x86 support
-(IDE image mounting, CMOS injection, boot-ROM loading) on the core name, so
-a patched Main is required; the one-line `is_x86()` change plus a gcc-6
-compatibility fix live in `scripts/mister-main-pc110.patch` (apply to the
-`upstream-main` tree and build with the misterkun/toolchain container using
-`make BASE=arm-linux-gnueabihf CC='arm-linux-gnueabihf-gcc -mcpu=cortex-a9
--mfpu=neon -mfloat-abi=hard'`).
+The core identifies itself as `PC110`. MiSTer Main supplies a shared x86
+transport for IDE image mounting, CMOS injection and boot-ROM loading. The
+series in `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`.
+Machine-specific geometry is isolated in the profile, while the IDE behavior
+corrections are separate generic patches suitable for upstream review.
 
-The December 2024 upstream ao486 prefetch-reset fix (`be9b103`) is
-cherry-picked into `rtl/ao486/memory/prefetch.v`.
+A December 2024 upstream prefetch-reset correction (`be9b103`) is retained in
+`rtl/ao486/memory/prefetch.v`.
 
 ## Verification
 
@@ -70,7 +68,7 @@ writable PCIC state, font controls, and upper-memory shadow decode with
 Icarus Verilog.
 
 `scripts/sim-post.sh` executes the real 256 KiB flash image from the reset
-vector on the full memory path (ao486 CPU, iobus, pc110_chipset, the modified
+vector on the full memory path (486SX CPU, iobus, pc110_chipset, the modified
 l2_cache, and a latency/backpressure DDR model) and traces all I/O, memory
 writes, flag changes, and executed EIPs.  Findings from that harness:
 
@@ -116,7 +114,7 @@ ROM offsets:
    the BIOS's own gate (8042 status bit4 = inhibited, asserted only inside
    the `56h`-`5Ah` checkpoint window): its pass path ends in a stuck-key
    check that consults the system MCU through an SMI API (`AX=5380h`)
-   whose result returns in CPU registers rewritten by SMM - ao486 has no
+   whose result returns in CPU registers rewritten by SMM - the CPU core has no
    SMM, so the check fails deterministically.  The MAIN keyboard test
    (checkpoint `6Dh`) still runs with bit4=1 and passes.
 
@@ -136,7 +134,7 @@ with correct Kanji, working keyboard (F1 opens its Help), and the RTC
 clock right.  A second display blocker fell with it: the Input Status 1
 shim forced bit0=1, deadlocking \$DISP.SYS's interrupts-off wait for
 active display after its mode-12h set - 3DAh/3BAh are no longer shimmed
-and the real ao486 VGA status answers.
+and the implemented VGA status answers.
 
 Easy-Setup entry: the BIOS's F1 gate reads the held key from the system
 MCU via SMI (un-emulatable), but the same INT19 decision first tests
@@ -162,7 +160,8 @@ core - Main is synced between units now (backup MiSTer.bak-20260729).
 **IBM Easy-Setup is interactive.** The setup request already reached the INT19
 decision (`CMOS 7Bh = 0Ah` once, then `02h` after one-shot consumption), but
 two firmware paths still depended on PC110 system-management behavior absent
-from ao486. `scripts/prepare-roms.sh` now applies two size-preserving patches
+from the current CPU/platform implementation. `scripts/prepare-roms.sh` now
+applies two size-preserving patches
 to the validated IBM image:
 
 - `F000:8145` changes `jnz 815Bh` to `jnz 817Ch`, routing CMOS bit 3 directly
@@ -172,7 +171,8 @@ to the validated IBM image:
 
 MiSTer Main actually executes the split `boot0.rom`/`boot1.rom`, so these are
 generated from the patched copy as well as `pc110_bios.bin`. On unit
-`192.168.1.74`, the serial trace showed `ECED[11]=00h` and `ECED[12]=00h`,
+On the primary test MiSTer, the serial trace showed `ECED[11]=00h` and
+`ECED[12]=00h`,
 followed by their restoration. The real IBM Easy-Setup home page appeared,
 and Right Arrow moved selection from Config to Date/Time.
 
@@ -199,17 +199,28 @@ Hardware evidence:
   `b06ef449802ad310fcbf17aa5aa2df2677d394ab01a09cfb3d815f095a2a7aca`
 - patched PersonaWare VHD SHA-256:
   `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
+- release RBF SHA-256:
+  `aa0ed49ef09e1d6745e595034064f3f780c891f2a225de6867e1c202f412253e`
+- full Quartus timing build: worst setup slack `+0.410 ns`, worst hold slack
+  `+0.245 ns`, and zero TNS in every reported domain
+- current patched Main SHA-256:
+  `b784bf841164c7254da6b7ac0de0964a9d113f7e28ea76318d25df0edc8a6398`
+- 29 July 2026 hardware verification on two DE10-Nano MiSTer systems: both
+  reported `CORE=PC110`, EBDA error count/code `00h/0000h`, and booted
+  PersonaWare with working storage and video
+- current MiSTer framework release verified on both boards: each on-device RBF
+  matched the release SHA, reported `CORE=PC110`, and reached PersonaWare at
+  native 640x480
+- a PID change after `/dev/MiSTer_cmd` `load_core` is expected: current Main
+  deliberately restarts itself after loading any RBF via `app_restart()`
 
 Known follow-ups:
 
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
-- MiSTer Main crashes and respawns on load_core while the PC110 core runs
-  (FPGA keeps running; automation must timeout FIFO writes) - suspect our
-  Main patch, not yet investigated
 - RAM-size OSD menu (4/8/12/20 MB) still to be added
-- the EBDA errlog snoop and 8042/CMOS trace tags are debug aids; strip or
-  gate them for a release build
+- the optional POST UART trace is disabled in release builds; enable the
+  chipset's `POSTLOG_ENABLE` parameter only for hardware bring-up
 
 Hardware smoke tests should record:
 
@@ -217,4 +228,5 @@ Hardware smoke tests should record:
 - MiSTer Main version
 - `/tmp/CORENAME`
 - installed ROM sizes and hashes
-- serial POST trace (`cap.sh`), EBDA error count/code, and a screenshot
+- EBDA error count/code and a native MiSTer screenshot
+- for diagnostic builds only, the serial POST trace

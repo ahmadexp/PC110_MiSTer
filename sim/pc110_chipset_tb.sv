@@ -14,6 +14,9 @@ module pc110_chipset_tb;
 	logic [6:0] font_bank;
 	logic [7:0] font_segment;
 	logic font_enable;
+	logic postlog_tx;
+	logic kbd_hide;
+	logic ckpt_boot;
 
 	always #5 clk = ~clk;
 
@@ -31,7 +34,14 @@ module pc110_chipset_tb;
 		.shadow_read_enable(shadow_re),
 		.font_bank_select(font_bank),
 		.font_window_segment(font_segment),
-		.font_window_enable(font_enable)
+		.font_window_enable(font_enable),
+		.postlog_tx(postlog_tx),
+		.io_snoop(8'hFF),
+		.errlog_wr(1'b0),
+		.errlog_tag(8'h00),
+		.errlog_byte(8'h00),
+		.kbd_hide(kbd_hide),
+		.ckpt_boot(ckpt_boot)
 	);
 
 	task automatic write_port(input [15:0] port_num, input [7:0] value);
@@ -73,6 +83,18 @@ module pc110_chipset_tb;
 	initial begin
 		repeat(3) @(posedge clk);
 		reset = 0;
+
+		if(postlog_tx !== 1'b1)
+			$fatal(1, "POST logger UART must idle high");
+
+		// Checkpoint tracking remains functional when the optional trace FIFO
+		// is compiled out of the release build.
+		write_port(16'h0190, 8'h56);
+		if(kbd_hide !== 1'b1 || ckpt_boot !== 1'b0)
+			$fatal(1, "early keyboard checkpoint decode mismatch");
+		write_port(16'h0190, 8'h6E);
+		if(kbd_hide !== 1'b0 || ckpt_boot !== 1'b1)
+			$fatal(1, "boot checkpoint decode mismatch");
 
 		// PCIC is visible without a gate and identifies both sockets.
 		write_port(16'h03E0, 8'h00);
