@@ -82,13 +82,13 @@ the lot:
 
     MISTER_HOST=root@mister.local scripts/deploy-mister.sh
 
-The dated RBF filename is `IBM PC110_<date>.rbf`, so the MiSTer core browser
-shows **IBM PC110**. Internally the core advertises the standard `AO486` x86
-service identity. This lets stock Main provide IDE, CMOS and boot-ROM services
-without a PC110-specific machine profile. Consequently `/tmp/CORENAME`, the
-Home folder, saved OSD state and remembered file paths use the AO486 name. Back
-up an existing ao486 setup before installing PC110 ROMs or configuration on the
-same SD card.
+The deploy script installs the RBF as `IBM PC110_<date>.rbf`, so the MiSTer core
+browser shows **IBM PC110**. Internally the core advertises the standard
+`AO486` x86 service identity. This lets stock Main provide IDE, CMOS and
+boot-ROM services without a PC110-specific machine profile. Consequently
+`/tmp/CORENAME`, the Home folder, saved OSD state and remembered file paths use
+the AO486 name. Back up an existing ao486 setup before installing PC110 ROMs or
+configuration on the same SD card.
 
 ### Hard-disk geometry
 
