@@ -97,13 +97,14 @@ same-basename `.cfg` file beside the image. For `Personaware-disk.vhd`, create
 `Personaware-disk.cfg` containing:
 
 ```ini
-HEADS=2
-SECTORS=32
-CYLINDERS=128
+HEADS = 2
+SECTORS = 32
+CYLINDERS = 128
 ```
 
 `CYLINDERS` must equal `image_size / (512 * HEADS * SECTORS)` when the entire
-image is addressable. The example above is for a 4 MiB raw VHD. Main reads this
+image is addressable. Keep the spaces around `=`; Main's legacy metadata parser
+requires them. The example above is for a 4 MiB raw VHD. Main reads this
 standard image metadata before the core-supplied fallback geometry, so no
 PC110-specific geometry code is required in Main. A copyable template is in
 [`examples/pc110-vhd.cfg`](examples/pc110-vhd.cfg).
