@@ -53,11 +53,13 @@ Two important corrections follow from that rule:
 
 ## Core identity and Main support
 
-The core identifies itself as `PC110`. MiSTer Main supplies a shared x86
-transport for IDE image mounting, CMOS injection and boot-ROM loading. The
-series in `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`.
-Machine-specific geometry is isolated in the profile, while the IDE behavior
-corrections are separate generic patches suitable for upstream review.
+The RBF is named `IBM PC110_<date>.rbf` for the MiSTer browser. Its internal
+service identifier is `AO486`, allowing stock Main to supply the shared x86
+transport for IDE image mounting, CMOS injection and boot-ROM loading. Main has
+no PC110 profile or geometry branch. Each VHD supplies native geometry through
+a same-basename `.cfg`; the 4 MiB PersonaWare image uses 2 heads, 32 sectors
+per track and 128 cylinders. The remaining Main patch contains generic ATA
+responses suitable for independent upstream review.
 
 A December 2024 upstream prefetch-reset correction (`be9b103`) is retained in
 `rtl/ao486/memory/prefetch.v`.

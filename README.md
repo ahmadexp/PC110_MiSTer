@@ -77,23 +77,43 @@ hardware-tested build under [releases/](releases) if you'd rather not compile.
 ## Installing
 
 Copy the RBF into `_Computer` and drop `pc110_bios.bin` (and `pc110_font.bin`
-if you have it) into `games/PC110`. If you can SSH into your MiSTer this does
+if you have it) into `games/ao486`. If you can SSH into your MiSTer this does
 the lot:
 
     MISTER_HOST=root@mister.local scripts/deploy-mister.sh
 
-The core calls itself `PC110` everywhere: OSD title, config dir, `/tmp/CORENAME`
-and the ROM path (`games/PC110`). The deploy script timestamps the RBF; rename
-it to `IBM PC110_<date>.rbf` if you want the full name in the core browser, the
-internal `PC110` id doesn't change.
+The dated RBF filename is `IBM PC110_<date>.rbf`, so the MiSTer core browser
+shows **IBM PC110**. Internally the core advertises the standard `AO486` x86
+service identity. This lets stock Main provide IDE, CMOS and boot-ROM services
+without a PC110-specific machine profile. Consequently `/tmp/CORENAME`, the
+Home folder, saved OSD state and remembered file paths use the AO486 name. Back
+up an existing ao486 setup before installing PC110 ROMs or configuration on the
+same SD card.
 
-### Main patch
+### Hard-disk geometry
 
-You need a patched Main for now. Stock Main only switches on its x86 services
-(IDE mounting, CMOS, ROM loading) for cores it recognises by name, and it
-doesn't know PC110. The series in `scripts/main-patches` adds a PC110 profile,
-makes the machine geometry authoritative, and fills in a couple of generic ATA
-commands the IBM BIOS leans on. It's up for review as
+PC110-compatible VHDs must declare the machine's native CHS geometry in a
+same-basename `.cfg` file beside the image. For `Personaware-disk.vhd`, create
+`Personaware-disk.cfg` containing:
+
+```ini
+HEADS=2
+SECTORS=32
+CYLINDERS=128
+```
+
+`CYLINDERS` must equal `image_size / (512 * HEADS * SECTORS)` when the entire
+image is addressable. The example above is for a 4 MiB raw VHD. Main reads this
+standard image metadata before the core-supplied fallback geometry, so no
+PC110-specific geometry code is required in Main. A copyable template is in
+[`examples/pc110-vhd.cfg`](examples/pc110-vhd.cfg).
+
+### Main integration
+
+Stock Main provides the required x86 transport. The optional patch series in
+`scripts/main-patches` contains only generic ATA diagnostic/read-verify command
+handling. It neither identifies PC110 nor overrides image geometry. The work is
+under review as
 [Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252).
 
     scripts/apply-main-patches.sh /path/to/Main_MiSTer
@@ -103,8 +123,8 @@ then build Main the usual way in the arm toolchain container.
 ## Notes
 
 * WIN+F12 opens the PC110 OSD. Plain F12 passes through as a normal PC key.
-* Mount a raw VHD at IDE 0-0 for the hard disk, and hit "Reset and apply HDD"
-  after you change disks.
+* Mount a raw VHD plus its same-basename geometry `.cfg` at IDE 0-0, and hit
+  "Reset and apply HDD" after you change disks.
 * Changing the RAM Module setting automatically resets the machine. The OSD
   shows both the module capacity and resulting total memory.
 * Loading the whole flash isn't redundant. Main's usual `boot1.rom` path only

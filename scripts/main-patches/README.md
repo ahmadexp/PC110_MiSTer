@@ -1,18 +1,14 @@
 # MiSTer Main integration
 
-These patches are based on MiSTer-devel/Main_MiSTer commit
-`ffcdf1edb52c95705298d2fe23e9737e08b75b65` and are intentionally separated
-for upstream review:
+This generic patch applies to MiSTer-devel/Main_MiSTer commit
+`c633d2246078d37864bcd2c3fcf68725f7c1ca73`:
 
-1. `0001` makes the existing IDE geometry arguments authoritative. This is a
-   generic API correction.
-2. `0002` adds `PC110` as an explicit x86 machine profile and gives that profile
-   its native two-head, 32-sector disk geometry.
-3. `0003` completes two generic ATA command responses required by the IBM BIOS.
-4. `0004` fixes a generic `errno` macro collision exposed by MiSTer's legacy
-   Main build toolchain.
+1. `0001` completes generic ATA diagnostic, seek, standby-immediate and
+   read-verify command responses used by system BIOSes.
 
-PC110 uses Main's shared x86 transport with its own profile and policy.
+PC110 advertises the existing `AO486` x86 service identity. Main's standard VHD
+metadata parser supplies disk geometry from a same-basename `.cfg`, so this
+patch contains no PC110 name, machine profile or geometry override.
 
 Apply the series to a clean Main checkout:
 
@@ -20,5 +16,7 @@ Apply the series to a clean Main checkout:
 scripts/apply-main-patches.sh /path/to/Main_MiSTer
 ```
 
-The patches are kept as a reviewable series so they can become separate
-upstream pull requests.
+The patch is kept in reviewable form while
+[Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252)
+is under review. The former scaler build patch was merged upstream as
+[Main_MiSTer#1253](https://github.com/MiSTer-devel/Main_MiSTer/pull/1253).

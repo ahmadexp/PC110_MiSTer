@@ -1,17 +1,17 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 9eeb57eaa9d287ae24396a7348da3a7b51d66bd5 Mon Sep 17 00:00:00 2001
 From: ahmadexp <ahmadexp@gmail.com>
 Date: Tue, 28 Jul 2026 23:32:58 -0700
-Subject: [PATCH 3/4] IDE: complete common no-data ATA commands
+Subject: [PATCH] IDE: complete common no-data ATA commands
 
 ---
- ide.cpp | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ ide.cpp | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
 diff --git a/ide.cpp b/ide.cpp
-index 329e8d8..bc5d985 100644
+index 1452a5f..1b01e58 100644
 --- a/ide.cpp
 +++ b/ide.cpp
-@@ -949,7 +949,24 @@ static int handle_hdd(ide_config *ide)
+@@ -946,7 +946,24 @@ static int handle_hdd(ide_config *ide)
  
  	case 0x40: // READ VERIFY
  		dbg_printf("Received read verify command. Not implemented but returning OK.\n");

@@ -12,14 +12,15 @@ firmware.
 - current MiSTer framework under `sys`
 - synthesizable core RTL under `rtl`
 - dated release bitstream under `releases`
-- unique non-arcade Home folder: `games/PC110`
+- browser-visible release name: `IBM PC110_<date>.rbf`
+- standard x86 service identity and Home folder: `AO486` / `games/ao486`
 - no IBM BIOS, font ROM, operating-system image, or VHD tracked or released
 - self-checking chipset testbench in GitHub Actions
 
 The framework migration is based on MiSTer-devel/Template_MiSTer commit
 `69b8a2acc6d84dd313b5abcba6a17155287ed3d8`. The Main patch series is based
 on MiSTer-devel/Main_MiSTer commit
-`ffcdf1edb52c95705298d2fe23e9737e08b75b65`.
+`c633d2246078d37864bcd2c3fcf68725f7c1ca73`.
 
 Run the local checks with:
 
@@ -28,22 +29,27 @@ scripts/test.sh
 scripts/check-release.sh
 ```
 
-## Integration dependency
+## Main integration
 
-MiSTer Main needs an explicit PC110 machine profile for IDE geometry, CMOS,
-and boot-ROM handling. The proposed upstream integration is:
+The core advertises Main's standard `AO486` x86 service identity, so stock Main
+provides IDE mounting, CMOS injection and boot-ROM loading without any
+PC110-specific profile. Disk geometry is image-owned metadata: a 4 MiB PC110
+VHD has a same-basename `.cfg` containing `HEADS=2`, `SECTORS=32`, and
+`CYLINDERS=128`.
+
+The remaining upstream work is generic and not required to identify the core:
 
 - [Main_MiSTer pull request 1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252)
-- [independent Main build fix 1253](https://github.com/MiSTer-devel/Main_MiSTer/pull/1253)
+- [merged independent Main build fix 1253](https://github.com/MiSTer-devel/Main_MiSTer/pull/1253)
 
-The core repository is reviewable independently, but general distribution
-should be coordinated with pull request 1252 so a stock Main binary recognizes
-the `PC110` core identifier.
+Pull request 1252 adds ATA diagnostic/read-verify behavior useful to system
+BIOSes. Pull request 1253 is an already-merged independent legacy-toolchain
+build fix. Neither change selects PC110 geometry or adds a PC110 name to Main.
 
 ## Hardware acceptance evidence
 
 The release candidate is tested on two independent DE10-Nano MiSTer systems.
-Both systems must report `/tmp/CORENAME` as `PC110`, complete IBM BIOS POST
+Both systems must report `/tmp/CORENAME` as `AO486`, complete IBM BIOS POST
 without an EBDA error, and reach the PersonaWare desktop from the same release
 RBF. Native screenshots and local build reports are retained as test artifacts;
 only redistributable screenshots are committed.

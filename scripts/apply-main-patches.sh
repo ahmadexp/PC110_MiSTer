@@ -10,13 +10,10 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 main_dir="$(cd "$1" && pwd)"
 patch_dir="${repo_dir}/scripts/main-patches"
 patches=(
-  "${patch_dir}/0001-IDE-honor-explicit-core-geometry.patch"
-  "${patch_dir}/0002-x86-add-an-explicit-PC110-machine-profile.patch"
-  "${patch_dir}/0003-IDE-complete-diagnostic-and-read-verify-commands.patch"
-  "${patch_dir}/0004-scaler-avoid-the-errno-macro-in-a-field-name.patch"
+  "${patch_dir}/0001-IDE-complete-common-no-data-ATA-commands.patch"
 )
 
 git -C "${main_dir}" apply --check "${patches[@]}"
 git -C "${main_dir}" apply "${patches[@]}"
 
-echo "Applied the PC110 Main integration to ${main_dir}"
+echo "Applied the generic Main compatibility patches to ${main_dir}"

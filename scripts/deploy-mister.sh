@@ -6,7 +6,7 @@ mister_host="${MISTER_HOST:-root@mister.local}"
 rbf_path="${repo_dir}/artifacts/PC110.rbf"
 rom_dir="${repo_dir}/artifacts/roms"
 stamp="$(date +%Y%m%d-%H%M%S)"
-remote_stage="/media/fat/games/PC110"
+remote_stage="/media/fat/games/ao486"
 remote_rbf="/media/fat/_Computer/IBM PC110_${stamp}.rbf"
 remote_rbf_upload="/media/fat/_Computer/PC110.upload.rbf"
 
@@ -16,12 +16,9 @@ if [[ ! -s "${rbf_path}" || ! -s "${rom_dir}/boot0.rom" ||
   exit 1
 fi
 
-# The core identifies itself as PC110, so Main keeps every asset under the
-# PC110 name: boot ROMs in games/PC110 and remembered FC6/FC7 paths in
-# config/PC110.f6 and PC110.f7. No other core's assets are touched.
-#
-# Main's x86 support (IDE image mounting, CMOS) activates by core name, so a
-# Main binary that recognizes PC110 is required; see docs/STATUS.md.
+# The browser-visible RBF name is IBM PC110, while the internal service name is
+# AO486 so the core works with stock Main's x86 transport. Main therefore uses
+# games/ao486 and AO486-named config files. Existing files are not deleted.
 
 # Remove earlier PC110 builds before staging the new one so the core list
 # does not accumulate stale bitstreams across rapid iteration.  Set
@@ -41,13 +38,13 @@ if [[ -s "${rom_dir}/pc110_font.bin" ]]; then
   scp "${rom_dir}/pc110_font.bin" "${mister_host}:${remote_stage}/"
 fi
 
-ssh "${mister_host}" "printf '${remote_stage}/pc110_bios.bin\\0' > /media/fat/config/PC110.f7 && \
+ssh "${mister_host}" "printf '${remote_stage}/pc110_bios.bin\\0' > /media/fat/config/AO486.f7 && \
   if [ -f '${remote_stage}/pc110_font.bin' ]; then \
-    printf '${remote_stage}/pc110_font.bin\\0' > /media/fat/config/PC110.f6; \
+    printf '${remote_stage}/pc110_font.bin\\0' > /media/fat/config/AO486.f6; \
   fi && \
-  printf '\\004\\000\\000\\000' > /media/fat/config/uartmode.PC110 && \
+  printf '\\004\\000\\000\\000' > /media/fat/config/uartmode.AO486 && \
   printf '\\000\\302\\001\\000\\022\\172\\000\\000\\000\\113\\000\\000' \
-    > /media/fat/config/uartspeed.PC110 && \
+    > /media/fat/config/uartspeed.AO486 && \
   sync"
 
 echo "Deployed ${remote_rbf}"
