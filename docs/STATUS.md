@@ -56,10 +56,11 @@ Two important corrections follow from that rule:
 The RBF is named `IBM PC110_<date>.rbf` for the MiSTer browser. Its internal
 service identifier is `AO486`, allowing stock Main to supply the shared x86
 transport for IDE image mounting, CMOS injection and boot-ROM loading. Main has
-no PC110 profile or geometry branch. Each VHD supplies native geometry through
-a same-basename `.cfg`; the 4 MiB PersonaWare image uses 2 heads, 32 sectors
-per track and 128 cylinders. The remaining Main patch contains generic ATA
-responses suitable for independent upstream review.
+no PC110 profile or geometry branch. When needed, a VHD supplies its existing
+geometry through a same-basename `.cfg`; the tested 4 MiB PersonaWare image's
+MBR and BPB already use 2 heads, 32 sectors per track and 128 cylinders. The
+metadata declares rather than replaces those values. The remaining Main patch
+contains generic ATA responses suitable for independent upstream review.
 
 A December 2024 upstream prefetch-reset correction (`be9b103`) is retained in
 `rtl/ao486/memory/prefetch.v`.

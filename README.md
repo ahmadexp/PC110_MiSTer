@@ -92,9 +92,15 @@ configuration on the same SD card.
 
 ### Hard-disk geometry
 
-PC110-compatible VHDs must declare the machine's native CHS geometry in a
-same-basename `.cfg` file beside the image. For `Personaware-disk.vhd`, create
-`Personaware-disk.cfg` containing:
+CHS metadata must describe the geometry already used when the disk was
+partitioned and formatted. It must never be used to convert or replace an
+existing image's geometry: a mismatch can make partitions invisible or cause
+writes to address the wrong sectors.
+
+The tested 4 MiB `Personaware-disk.vhd` already encodes 2 heads and 32 sectors
+per track. Its MBR partition starts at `C0/H1/S1`, ends at `C127/H1/S32`, and
+its FAT BPB records 32 sectors per track, 2 heads, and 32 hidden sectors. To
+declare that existing geometry to Main, place `Personaware-disk.cfg` beside it:
 
 ```ini
 HEADS = 2
@@ -102,12 +108,12 @@ SECTORS = 32
 CYLINDERS = 128
 ```
 
-`CYLINDERS` must equal `image_size / (512 * HEADS * SECTORS)` when the entire
-image is addressable. Keep the spaces around `=`; Main's legacy metadata parser
-requires them. The example above is for a 4 MiB raw VHD. Main reads this
-standard image metadata before the core-supplied fallback geometry, so no
-PC110-specific geometry code is required in Main. A copyable template is in
-[`examples/pc110-vhd.cfg`](examples/pc110-vhd.cfg).
+`CYLINDERS` is 128 because `4194304 / (512 * 2 * 32) = 128`. Keep the spaces
+around `=`; Main's legacy metadata parser requires them. For any other VHD,
+inspect its partition table and BPB and use their existing geometry, or omit
+the `.cfg` if Main's fallback already matches. Do not copy the PersonaWare
+values onto an arbitrary image. A copyable, image-specific example is in
+[`examples/personaware-4mib.cfg`](examples/personaware-4mib.cfg).
 
 ### Main integration
 
@@ -124,8 +130,8 @@ then build Main the usual way in the arm toolchain container.
 ## Notes
 
 * WIN+F12 opens the PC110 OSD. Plain F12 passes through as a normal PC key.
-* Mount a raw VHD plus its same-basename geometry `.cfg` at IDE 0-0, and hit
-  "Reset and apply HDD" after you change disks.
+* Mount a raw VHD at IDE 0-0. Add a same-basename `.cfg` only when it accurately
+  declares that image's existing CHS geometry, then hit "Reset and apply HDD".
 * Changing the RAM Module setting automatically resets the machine. The OSD
   shows both the module capacity and resulting total memory.
 * Loading the whole flash isn't redundant. Main's usual `boot1.rom` path only
