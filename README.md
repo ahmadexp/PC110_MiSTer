@@ -1,4 +1,4 @@
-# IBM Palm Top PC 110 for MiSTer
+# IBM Palm Top PC 110 Core for MiSTer
 
 A MiSTer core for the IBM Palm Top PC 110, the pocketable 486 PC that IBM sold
 in Japan in 1995. It combines MiSTer's established x86 CPU and PC-compatible
@@ -10,13 +10,6 @@ IBM Easy-Setup, and takes PC DOS J7.0/V all the way into the PersonaWare
 desktop with the keyboard and Japanese text working. Still a work in progress
 though, not every chip on the planar is modelled cycle-for-cycle. See
 [docs/STATUS.md](docs/STATUS.md) for what's verified and what's left.
-
-## MiSTer submission
-
-Submitted for official MiSTer inclusion on July 29, 2026 and awaiting
-maintainer review. The required Main integration is tracked in
-[MiSTer-devel/Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252);
-the full validation record is in [docs/SUBMISSION.md](docs/SUBMISSION.md).
 
 ## What works
 
