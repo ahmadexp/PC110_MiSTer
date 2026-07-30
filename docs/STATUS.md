@@ -27,6 +27,7 @@ Two important corrections follow from that rule:
 | ROM shadow protection | implemented | write enable per 16 KiB upper-memory block |
 | CMOS | implemented | floppy/equipment/base/extended-memory fields plus checksum |
 | PCMCIA | register skeleton | two empty sockets, PCIC identity and writable ExCA registers; no cards or IRQ routing |
+| Internal modem | transport implemented | COM1 is connected to Main's modem transport at the PC110 diagnostic's 19,200 baud; PC110-specific identification responses remain incomplete |
 | font ROM | implemented | 1 MiB DDR image, banked 8 KiB window |
 | inking | minimal | idle/status behavior needed for enumeration only |
 | EC-A / EC-B | captured defaults | not a functional power-management microcontroller |
@@ -200,9 +201,9 @@ Hardware evidence:
 - patched PersonaWare VHD SHA-256:
   `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
 - release RBF SHA-256:
-  `aa0ed49ef09e1d6745e595034064f3f780c891f2a225de6867e1c202f412253e`
-- full Quartus timing build: worst setup slack `+0.410 ns`, worst hold slack
-  `+0.245 ns`, and zero TNS in every reported domain
+  `cc99faa66406ca1fda493759179f0d87fb856889cf33a2ff1661a9efec8cfd65`
+- full Quartus timing build: worst setup slack `+0.372 ns`, worst hold slack
+  `+0.243 ns`, and zero TNS in every reported domain
 - current patched Main SHA-256:
   `b784bf841164c7254da6b7ac0de0964a9d113f7e28ea76318d25df0edc8a6398`
 - 29 July 2026 hardware verification on two DE10-Nano MiSTer systems: both
@@ -219,6 +220,14 @@ Known follow-ups:
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
 - RAM-size OSD menu (4/8/12/20 MB) still to be added
+- Easy-Setup hardware diagnostics still report SystemBoard `001/02`,
+  HDD-1 `017/21`, PCMCIA `088/20`, and Parallel `009/11`. Hardware traces
+  disproved simple IRQ-delay, read-hold, and synthetic-ACK fixes, so those
+  shims are not included in the release.
+- the internal-modem transport reaches the PC110's `AT`, raw `W`, `ATI`, and
+  `ATI2` probes at 19,200 baud. Main's generic Hayes responder does not yet
+  reproduce the PC110 modem's exact identification exchange, so the complete
+  Easy-Setup modem test is not claimed as passing.
 - the optional POST UART trace is disabled in release builds; enable the
   chipset's `POSTLOG_ENABLE` parameter only for hardware bring-up
 

@@ -1,21 +1,29 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ahmadexp <ahmadexp@gmail.com>
 Date: Tue, 28 Jul 2026 23:32:58 -0700
-Subject: [PATCH 3/4] IDE: complete diagnostic and read-verify commands
+Subject: [PATCH 3/4] IDE: complete common no-data ATA commands
 
 ---
- ide.cpp | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ ide.cpp | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/ide.cpp b/ide.cpp
-index 329e8d8..cd24049 100644
+index 329e8d8..bc5d985 100644
 --- a/ide.cpp
 +++ b/ide.cpp
-@@ -949,7 +949,16 @@ static int handle_hdd(ide_config *ide)
+@@ -949,7 +949,24 @@ static int handle_hdd(ide_config *ide)
  
  	case 0x40: // READ VERIFY
  		dbg_printf("Received read verify command. Not implemented but returning OK.\n");
 -		ide->regs.status = ATA_STATUS_RDY | ATA_STATUS_IRQ;
++		ide->regs.error = 0;
++		ide->regs.status = ATA_STATUS_RDY | ATA_STATUS_DSC | ATA_STATUS_IRQ;
++		ide_set_regs(ide);
++		break;
++
++	case 0x70: // seek
++	case 0xE3: // standby immediate
++		// These no-data commands complete immediately for image-backed disks.
 +		ide->regs.error = 0;
 +		ide->regs.status = ATA_STATUS_RDY | ATA_STATUS_DSC | ATA_STATUS_IRQ;
 +		ide_set_regs(ide);

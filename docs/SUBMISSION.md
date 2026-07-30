@@ -50,9 +50,9 @@ only redistributable screenshots are committed.
 
 Release `PC110_20260729.rbf` passed this regression on both systems. Its
 SHA-256 is
-`aa0ed49ef09e1d6745e595034064f3f780c891f2a225de6867e1c202f412253e`.
-The full Quartus 17.0.2 build completed with worst setup slack `+0.410 ns`,
-worst hold slack `+0.245 ns`, and zero TNS in every reported domain.
+`cc99faa66406ca1fda493759179f0d87fb856889cf33a2ff1661a9efec8cfd65`.
+The full Quartus 17.0.2 build completed with worst setup slack `+0.372 ns`,
+worst hold slack `+0.243 ns`, and zero TNS in every reported domain.
 
 ## Maintainer handoff
 

@@ -85,7 +85,7 @@ module pc110_chipset
 	logic [7:0] scamp [0:127];
 	logic [7:0] block2[0:255];
 	logic [7:0] eced [0:63];
-	logic [7:0] pcic [0:127];
+	logic [7:0] pcic [0:255];
 	logic [7:0] ecb [0:31];
 	logic [7:0] pos [0:7];
 	logic [7:0] xr [0:127];
@@ -94,12 +94,16 @@ module pc110_chipset
 	logic [6:0] scamp_index;
 	logic [7:0] block2_index;
 	logic [5:0] eced_index;
-	logic [6:0] pcic_index;
+	logic [7:0] pcic_index;
 	logic [4:0] ecb_index;
 	logic [7:0] font_bank;
 	logic [7:0] font_segment;
 	logic       font_enable;
 	logic [7:0] ink_control;
+	logic [7:0] lpt_data;
+	logic [4:0] lpt_control;
+	logic       lpt_ack_pending;
+	logic       lpt_status_read_d;
 	logic [7:0] planar_setup;
 	logic [7:0] planar_control;
 	logic [7:0] cfg22;
@@ -121,7 +125,7 @@ module pc110_chipset
 		for(i = 0; i < 128; i = i + 1) scamp[i] = 8'h00;
 		for(i = 0; i < 256; i = i + 1) block2[i] = 8'hFF;
 		for(i = 0; i < 64;  i = i + 1) eced[i] = 8'h00;
-		for(i = 0; i < 128; i = i + 1) pcic[i] = 8'h00;
+		for(i = 0; i < 256; i = i + 1) pcic[i] = 8'h00;
 		for(i = 0; i < 32;  i = i + 1) ecb[i] = 8'hFF;
 		for(i = 0; i < 8;   i = i + 1) pos[i] = 8'h00;
 
@@ -256,12 +260,14 @@ module pc110_chipset
 		xr[8'h55] = 8'hE5; xr[8'h57] = 8'h23;
 		xr[8'h60] = 8'h88; xr[8'h61] = 8'h2E;
 
-		// Ricoh RB5C396 / 82365-compatible controller.  Both sockets start
-		// empty; software can program the remaining ExCA register file.
-		pcic[8'h00] = 8'h83; pcic[8'h01] = 8'h33;
-		pcic[8'h02] = 8'h40; pcic[8'h06] = 8'h20;
+		// Ricoh RB5C396 / 82365-compatible controller: live post-boot ExCA
+		// register image captured from both sockets with no test card.
+		pcic[8'h00] = 8'h83; pcic[8'h01] = 8'h3F;
+		pcic[8'h1F] = 8'h80; pcic[8'h2F] = 8'h08;
+		pcic[8'h3A] = 8'hB2;
 		pcic[8'h40] = 8'h83; pcic[8'h41] = 8'h33;
-		pcic[8'h42] = 8'h40; pcic[8'h46] = 8'h20;
+		pcic[8'h5F] = 8'h80; pcic[8'h6F] = 8'h08;
+		pcic[8'h7A] = 8'hB2;
 
 		// EC-B live defaults.  Index is masked to five bits.
 		ecb[8'h00] = 8'h00; ecb[8'h02] = 8'hF5;
@@ -333,7 +339,21 @@ module pc110_chipset
 			// data when the chipset does not claim the address), which
 			// terminates every poll polarity with real frame timing.
 			16'h03E0: io_readdata = 8'hFF;
-			16'h03E1: io_readdata = pcic[pcic_index];
+			16'h03E1: begin
+				// Software Card Detect (register 16h bit5) is a write-only
+				// event source and always reads as zero.
+				if(pcic_index[5:0] == 6'h16)
+					io_readdata = pcic[pcic_index] & 8'hDF;
+				else
+					io_readdata = pcic[pcic_index];
+			end
+			// The PC110 BIOS publishes LPT1 at 03BCh in the BDA. Model the
+			// SPP data/control latches and an attached, ready virtual sink.
+			// INT 17h reports 90h for the ready/selected state expected by
+			// Easy-Setup's output test.
+			16'h03BC: io_readdata = lpt_data;
+			16'h03BD: io_readdata = lpt_ack_pending ? 8'h90 : 8'hD0;
+			16'h03BE: io_readdata = {3'b111, lpt_control};
 			16'h1160: io_readdata = {1'b0, font_bank[6:0]};
 			16'h1161: io_readdata = 8'hFF;
 			16'h1162: io_readdata = font_segment;
@@ -364,12 +384,16 @@ module pc110_chipset
 			scamp_index       <= 7'h00;
 			block2_index      <= 8'h00;
 			eced_index        <= 6'h00;
-			pcic_index        <= 7'h00;
+			pcic_index        <= 8'h00;
 			ecb_index         <= 5'h00;
 			font_bank         <= 8'h00;
 			font_segment      <= 8'hDE;
 			font_enable       <= 1'b1;
 			ink_control       <= 8'hC0;
+			lpt_data          <= 8'hFF;
+			lpt_control       <= 5'h0C;
+			lpt_ack_pending   <= 1'b0;
+			lpt_status_read_d <= 1'b0;
 			planar_setup      <= 8'hFF;
 			planar_control    <= 8'h00;
 			cfg22             <= 8'h00;
@@ -380,7 +404,15 @@ module pc110_chipset
 			block2_unlock_step <= 3'd0;
 		end
 		else begin
+			lpt_status_read_d <= io_read && (io_address == 16'h03BD);
+			// Hold ACK through the complete bus read. Clearing it on the
+			// first clock with io_read high made the CPU sample only D0h.
+			if(lpt_status_read_d &&
+			   !(io_read && io_address == 16'h03BD))
+				lpt_ack_pending <= 1'b0;
 			if(io_read) begin
+				if(io_address == 16'h03E1 && pcic_index[5:0] == 6'h04)
+					pcic[pcic_index] <= 8'h00;
 				case(block2_unlock_step)
 					3'd0: block2_unlock_step <= (io_address == 16'hFC23) ? 3'd1 : 3'd0;
 					3'd1: block2_unlock_step <= (io_address == 16'hF023) ? 3'd2 :
@@ -423,9 +455,28 @@ module pc110_chipset
 						if(planar_setup == 8'hDF) pos[io_address[2:0]] <= io_writedata;
 					16'h03D6: xr_index <= io_writedata[6:0];
 					16'h03D7: if(xr_index != 7'h00) xr[xr_index] <= io_writedata;
-					16'h03E0: pcic_index <= io_writedata[6:0];
-					16'h03E1: if((pcic_index[5:0] != 6'h00))
-						pcic[pcic_index] <= io_writedata;
+					// Ricoh extended ExCA registers use index bit 7.
+					// Easy-Setup explicitly walks registers 82h-96h.
+					16'h03E0: pcic_index <= io_writedata;
+					16'h03E1: begin
+						if(pcic_index[5:0] == 6'h16) begin
+							pcic[pcic_index] <= io_writedata & 8'hDF;
+							// Writing Software Card Detect raises the Card
+							// Detect Change latch for the selected socket.
+							if(io_writedata[5])
+								pcic[{pcic_index[6], 6'h04}] <=
+									pcic[{pcic_index[6], 6'h04}] | 8'h08;
+						end
+						else if(pcic_index[5:0] != 6'h00 &&
+						        pcic_index[5:0] != 6'h3A)
+							pcic[pcic_index] <= io_writedata;
+					end
+					16'h03BC: lpt_data <= io_writedata;
+					16'h03BE: begin
+						if(lpt_control[0] && !io_writedata[0])
+							lpt_ack_pending <= 1'b1;
+						lpt_control <= io_writedata[4:0];
+					end
 					16'h1160: font_bank <= {1'b0, io_writedata[6:0]};
 					16'h1162: font_segment <= io_writedata;
 					16'h1163: font_enable <= io_writedata[0];
@@ -530,6 +581,41 @@ module pc110_chipset
 				// command stream is visible alongside the 60h read stream.
 				16'h0060: begin plog_fifo[plog_tail] <= {8'h57, io_writedata}; plog_tail <= plog_tail + 1'd1; end
 				16'h0064: begin plog_fifo[plog_tail] <= {8'h4D, io_writedata}; plog_tail <= plog_tail + 1'd1; end
+				// Device-diagnostic trace ranges. Tags encode the port:
+				// A0-AF = 15E0h-15EFh writes, C0/C1 = PCIC index/data,
+				// C8-CA = PC110 LPT 3BCh-3BEh (the 378h aliases are also
+				// traced), D8-DF = COM2 2F8h-2FFh, E8-EF = COM1
+				// 3F8h-3FFh.
+				16'h15E0, 16'h15E1, 16'h15E2, 16'h15E3,
+				16'h15E4, 16'h15E5, 16'h15E6, 16'h15E7,
+				16'h15E8, 16'h15E9, 16'h15EA, 16'h15EB,
+				16'h15EC, 16'h15ED, 16'h15EE, 16'h15EF: begin
+					plog_fifo[plog_tail] <= {{4'hA, io_address[3:0]}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
+				16'h03E0, 16'h03E1: begin
+					plog_fifo[plog_tail] <= {{7'b1100000, io_address[0]}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
+				16'h0378, 16'h0379, 16'h037A, 16'h037B,
+				16'h037C, 16'h037D, 16'h037E, 16'h037F: begin
+					plog_fifo[plog_tail] <= {{5'b11001, io_address[2:0]}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
+				16'h03BC, 16'h03BD, 16'h03BE: begin
+					plog_fifo[plog_tail] <= {{6'b110010, io_address[1:0]}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
+				16'h02F8, 16'h02F9, 16'h02FA, 16'h02FB,
+				16'h02FC, 16'h02FD, 16'h02FE, 16'h02FF: begin
+					plog_fifo[plog_tail] <= {{5'b11011, io_address[2:0]}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
+				16'h03F8, 16'h03F9, 16'h03FA, 16'h03FB,
+				16'h03FC, 16'h03FD, 16'h03FE, 16'h03FF: begin
+					plog_fifo[plog_tail] <= {{5'b11101, io_address[2:0]}, io_writedata};
+					plog_tail <= plog_tail + 1'd1;
+				end
 				default: ;
 			endcase
 		end
@@ -575,6 +661,38 @@ module pc110_chipset
 		        io_snoop != kbc_last_status) begin
 			kbc_last_status <= io_snoop;
 			plog_fifo[plog_tail] <= {8'h53, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		// Matching device-diagnostic reads: B0-BF = 15E0h-15EFh,
+		// C2/C3 = PCIC, D0-D3 = LPT, E0-E7 = COM2, F0-F7 = COM1.
+		else if(io_read_d && !io_read &&
+		        io_address >= 16'h15E0 && io_address <= 16'h15EF) begin
+			plog_fifo[plog_tail] <= {{4'hB, io_address[3:0]}, io_readdata};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		else if(io_read_d && !io_read &&
+		        (io_address == 16'h03E0 || io_address == 16'h03E1)) begin
+			plog_fifo[plog_tail] <= {{7'b1100001, io_address[0]}, io_readdata};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		else if(io_read_d && !io_read &&
+		        io_address >= 16'h0378 && io_address <= 16'h037F) begin
+			plog_fifo[plog_tail] <= {{5'b11010, io_address[2:0]}, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		else if(io_read_d && !io_read &&
+		        io_address >= 16'h03BC && io_address <= 16'h03BE) begin
+			plog_fifo[plog_tail] <= {{6'b110100, io_address[1:0]}, io_readdata};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		else if(io_read_d && !io_read &&
+		        io_address >= 16'h02F8 && io_address <= 16'h02FF) begin
+			plog_fifo[plog_tail] <= {{5'b11100, io_address[2:0]}, io_snoop};
+			plog_tail <= plog_tail + 1'd1;
+		end
+		else if(io_read_d && !io_read &&
+		        io_address >= 16'h03F8 && io_address <= 16'h03FF) begin
+			plog_fifo[plog_tail] <= {{5'b11110, io_address[2:0]}, io_snoop};
 			plog_tail <= plog_tail + 1'd1;
 		end
 		// CMOS reads (port 71h) of the boot-order/diagnostic bytes: tag
