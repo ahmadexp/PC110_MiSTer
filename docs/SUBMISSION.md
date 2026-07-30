@@ -56,9 +56,11 @@ only redistributable screenshots are committed.
 
 Release `PC110_20260729.rbf` passed this regression on both systems. Its
 SHA-256 is
-`1f7a5a83301121b9bc57ac67d4f2fd8ae712fa874a830d68135ee87a7b174e76`.
-The full Quartus 17.0.2 build completed with worst setup slack `+0.530 ns`,
-worst hold slack `+0.245 ns`, and zero TNS in every reported domain.
+`468ef3fd5fc7d8dc0e4224eb8b99633075a782cb083ada025633a21b7b2cb332`.
+The full Quartus 17.0.2 build completed with worst setup slack `+0.361 ns`,
+worst hold slack `+0.252 ns`, and zero TNS in every reported domain. Both
+boards reported `/tmp/CORENAME=AO486`, EBDA error count/code `00h/0000h`, and
+reached PersonaWare using the 2/32/128 VHD metadata.
 
 ## Maintainer handoff
 
