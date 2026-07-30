@@ -9,7 +9,7 @@ are all PC110-specific.
 - `PC110.sv` and the Quartus `PC110.*` project files
 - `rtl/pc110/pc110_chipset.sv`
 - `rtl/pc110/pc110_host_bridge.v`
-- PC110 flash, font, shadow-memory and 20 MiB memory mapping
+- PC110 flash, font, shadow-memory and selectable 4/8/12/20 MiB memory mapping
 - PC110 CMOS values, Easy-Setup entry and machine-specific storage profile
 - PC110 simulations, ROM preparation and deployment
 

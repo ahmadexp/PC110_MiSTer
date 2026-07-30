@@ -24,3 +24,11 @@ iverilog -g2012 -Wall \
   "${repo_dir}/sim/pc110_chipset_tb.sv"
 
 vvp "${build_dir}/pc110_chipset_tb-postlog"
+
+iverilog -g2012 -Wall \
+  -s pc110_ram_config_tb \
+  -o "${build_dir}/pc110_ram_config_tb" \
+  "${repo_dir}/rtl/pc110/pc110_ram_config.sv" \
+  "${repo_dir}/sim/pc110_ram_config_tb.sv"
+
+vvp "${build_dir}/pc110_ram_config_tb"

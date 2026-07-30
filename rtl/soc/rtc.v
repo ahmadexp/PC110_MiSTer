@@ -37,7 +37,7 @@ module rtc(
 	input             io_write,
 	input       [7:0] io_writedata,
 
-	input             memcfg,
+	input       [1:0] ram_option,
 	input       [5:0] bootcfg,
 
 	// force CMOS 7Bh bit3 (enter setup on this boot) while held
@@ -91,6 +91,33 @@ reg io_read_last;
 always @(posedge clk) begin if(rst_n == 1'b0) io_read_last <= 1'b0; else if(io_read_last) io_read_last <= 1'b0; else io_read_last <= io_read; end 
 wire io_read_valid = io_read && io_read_last == 1'b0;
 
+reg [15:0] pc110_cmos_checksum = 16'h0000;
+reg  [1:0] pc110_checksum_ram_option = 2'd0;
+wire [15:0] pc110_extmem_kb;
+wire [15:0] pc110_above16_64k;
+wire [15:0] pc110_ram_checksum_sum;
+wire [15:0] pc110_saved_ram_checksum_sum;
+wire [15:0] pc110_cmos_checksum_adjusted = pc110_cmos_checksum -
+    pc110_saved_ram_checksum_sum + pc110_ram_checksum_sum;
+
+pc110_ram_config ram_config
+(
+    .ram_option(ram_option),
+    .word_limit(),
+    .extmem_kb(pc110_extmem_kb),
+    .above16_64k(pc110_above16_64k),
+    .checksum_sum(pc110_ram_checksum_sum)
+);
+
+pc110_ram_config saved_ram_config
+(
+    .ram_option(pc110_checksum_ram_option),
+    .word_limit(),
+    .extmem_kb(),
+    .above16_64k(),
+    .checksum_sum(pc110_saved_ram_checksum_sum)
+);
+
 always @(posedge clk) begin
     if(rst_n == 1'b0) setup_ack <= 1'b0;
     else              setup_ack <= io_read_valid && io_address == 1'b1 &&
@@ -124,8 +151,16 @@ wire [7:0] io_readdata_next =
     // so the internal disk is never booted.  Masking them makes the BIOS
     // honor the configured boot order.
     (ram_address == 7'h0E) ? (ram_q & 8'h3F) :
-    (ram_address == 7'h34 & memcfg) ? 8'h00 :
-    (ram_address == 7'h35 & memcfg) ? 8'h00 :
+    // Memory geometry is read directly from the OSD selection so changing a
+    // module followed by the automatic core reset cannot leave stale CMOS.
+    (ram_address == 7'h17) ? pc110_extmem_kb[7:0] :
+    (ram_address == 7'h18) ? pc110_extmem_kb[15:8] :
+    (ram_address == 7'h2E) ? pc110_cmos_checksum_adjusted[15:8] :
+    (ram_address == 7'h2F) ? pc110_cmos_checksum_adjusted[7:0] :
+    (ram_address == 7'h30) ? pc110_extmem_kb[7:0] :
+    (ram_address == 7'h31) ? pc110_extmem_kb[15:8] :
+    (ram_address == 7'h34) ? pc110_above16_64k[7:0] :
+    (ram_address == 7'h35) ? pc110_above16_64k[15:8] :
     // CMOS B8h-BFh (aliased to 38h-3Fh on this 128-byte RTC) hold the PC110
     // extended-CMOS checksum block.  POST's 184 check (F000:8FDF) sums
     // B8h..BEh, stopping at the first zero: an empty block (B8h==0) is
@@ -526,9 +561,8 @@ end
 
 // MiSTer Main initializes a generic PC-compatible CMOS. Translate the
 // machine-specific fields as they cross the management port so the IBM BIOS
-// sees the real PC110 equipment and 20 MiB memory geometry.  Recompute the
+// sees the real PC110 equipment and selected memory geometry. Recompute the
 // standard 10h..2Dh checksum over the translated values.
-reg [15:0] pc110_cmos_checksum;
 reg  [7:0] pc110_mgmt_data;
 
 always @* begin
@@ -549,21 +583,23 @@ always @* begin
         8'h1E: pc110_mgmt_data = 8'h00;
         8'h15: pc110_mgmt_data = 8'h80; // 640 KiB base memory
         8'h16: pc110_mgmt_data = 8'h02;
-        8'h17: pc110_mgmt_data = 8'h00; // 19 MiB above 1 MiB
-        8'h18: pc110_mgmt_data = 8'h4C;
-        8'h2E: pc110_mgmt_data = pc110_cmos_checksum[15:8];
-        8'h2F: pc110_mgmt_data = pc110_cmos_checksum[7:0];
-        8'h30: pc110_mgmt_data = 8'h00;
-        8'h31: pc110_mgmt_data = 8'h4C;
-        8'h34: pc110_mgmt_data = 8'h40; // 4 MiB above 16 MiB, in 64 KiB units
-        8'h35: pc110_mgmt_data = 8'h00;
+        8'h17: pc110_mgmt_data = pc110_extmem_kb[7:0];
+        8'h18: pc110_mgmt_data = pc110_extmem_kb[15:8];
+        8'h2E: pc110_mgmt_data = pc110_cmos_checksum_adjusted[15:8];
+        8'h2F: pc110_mgmt_data = pc110_cmos_checksum_adjusted[7:0];
+        8'h30: pc110_mgmt_data = pc110_extmem_kb[7:0];
+        8'h31: pc110_mgmt_data = pc110_extmem_kb[15:8];
+        8'h34: pc110_mgmt_data = pc110_above16_64k[7:0];
+        8'h35: pc110_mgmt_data = pc110_above16_64k[15:8];
         default: ;
     endcase
 end
 
 always @(posedge clk) begin
-    if(rst_n == 1'b0) pc110_cmos_checksum <= 16'h0000;
-    else if(mgmt_write && mgmt_address == 8'h00) pc110_cmos_checksum <= 16'h0000;
+    if(mgmt_write && mgmt_address == 8'h00) begin
+        pc110_cmos_checksum <= 16'h0000;
+        pc110_checksum_ram_option <= ram_option;
+    end
     else if(mgmt_write && mgmt_address >= 8'h10 && mgmt_address <= 8'h2D)
         pc110_cmos_checksum <= pc110_cmos_checksum + pc110_mgmt_data;
 end

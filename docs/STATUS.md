@@ -21,7 +21,7 @@ Two important corrections follow from that rule:
 | Area | State | Notes |
 |---|---|---|
 | CPU | inherited | 486SX-compatible no-FPU core; PLL power-on and runtime selection are fixed at 30 MHz, the closest characterized PC110 timing |
-| RAM | implemented | 20 MiB CPU-visible boundary |
+| RAM | implemented | selectable none/4/8/16 MiB module plus 4 MiB planar RAM, for 4/8/12/20 MiB total; CPU boundary and CMOS geometry change together |
 | BIOS flash | implemented for bring-up | complete 256 KiB image at `C0000h-FFFFFh`; shadow RAM currently shares the same DDR backing |
 | VL82C420 gates | implemented | observed SCAMP, block-2, and EC/ED unlock sequences |
 | ROM shadow protection | implemented | write enable per 16 KiB upper-memory block |
@@ -201,9 +201,9 @@ Hardware evidence:
 - patched PersonaWare VHD SHA-256:
   `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
 - release RBF SHA-256:
-  `cc99faa66406ca1fda493759179f0d87fb856889cf33a2ff1661a9efec8cfd65`
-- full Quartus timing build: worst setup slack `+0.372 ns`, worst hold slack
-  `+0.243 ns`, and zero TNS in every reported domain
+  `1f7a5a83301121b9bc57ac67d4f2fd8ae712fa874a830d68135ee87a7b174e76`
+- full Quartus timing build: worst setup slack `+0.530 ns`, worst hold slack
+  `+0.245 ns`, and zero TNS in every reported domain
 - current patched Main SHA-256:
   `b784bf841164c7254da6b7ac0de0964a9d113f7e28ea76318d25df0edc8a6398`
 - 29 July 2026 hardware verification on two DE10-Nano MiSTer systems: both
@@ -219,7 +219,6 @@ Known follow-ups:
 
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held
   IBF and broke POST; needs a copy-register relay that does not pin IBF)
-- RAM-size OSD menu (4/8/12/20 MB) still to be added
 - Easy-Setup hardware diagnostics still report SystemBoard `001/02`,
   HDD-1 `017/21`, PCMCIA `088/20`, and Parallel `009/11`. Hardware traces
   disproved simple IRQ-delay, read-hold, and synthetic-ACK fixes, so those
