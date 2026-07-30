@@ -246,7 +246,10 @@ localparam CONF_STR =
 	"P2o6,IDE 1-0 CD Hot-Swap,Yes,No;",
 	"P2o7,IDE 1-1 CD Hot-Swap,No,Yes;",
 	"P2-;",
-	"P2-,RAM: 20 MB (4 MB onboard + 16 MB card);",
+	// Keep the tested 16 MB module as option zero so existing configurations
+	// retain the historical 20 MB default. Changing the module automatically
+	// resets the machine below.
+	"P2oHI,RAM Module,16 MB (20 MB total),None (4 MB total),4 MB (8 MB total),8 MB (12 MB total);",
 `ifndef DEBUG
 	"P2-;",
 	"P2-,CPU: 486SX-class, 30MHz timing profile;",
@@ -822,7 +825,7 @@ system system
 	.mpu_rx               (mpu_rx),
 	.mpu_tx               (mpu_tx),
 	
-	.memcfg               (memcfg),
+	.ram_option           (status[50:49]),
 	.bootcfg              (status[37:32]),
 	
 	.DDRAM_CLK            (DDRAM_CLK),
@@ -841,11 +844,9 @@ wire [7:0] syscfg;
 wire       ps2_reset_n;
 wire       bios_setup_ack;
 
-// The PC110 has 4 MB onboard plus the 16 MB expansion card.  The memory
-// controller enforces the 20 MB boundary; select the smaller host profile so
-// older Main binaries never advertise 256 MB in their initial CMOS.
-reg memcfg = 1;
-always @(posedge clk_sys) if(reset) memcfg <= 1;
+// RAM option encoding (status bits 50:49): 0 = 16 MB module (20 MB total),
+// 1 = no module (4 MB), 2 = 4 MB module (8 MB), 3 = 8 MB module (12 MB).
+// Option zero preserves the hardware-tested 20 MB default for existing users.
 
 // "Enter BIOS Setup" (status[41]) and "Reset" (status[42]) menu actions.
 // Both pulse the core reset.  Easy-Setup entry does NOT work by injecting
@@ -868,10 +869,13 @@ always @(posedge clk_sys) begin
 	reg [27:0] bios_rst_cnt = 0;
 	reg [32:0] setup_cnt    = 0;
 	reg [27:0] mrst_cnt     = 0;
+	reg [27:0] ram_rst_cnt  = 0;
+	reg  [1:0] old_ram_option = 0;
 	reg        old_f1stb = 0;
 
 	old_bios <= status[48];
 	old_rst2 <= status[47];
+	old_ram_option <= status[50:49];
 
 	// real F1 make (set-2 code 05h) during POST arms setup entry too
 	old_f1stb <= ps2_key[10];
@@ -890,6 +894,11 @@ always @(posedge clk_sys) begin
 	if(status[47] & ~old_rst2) mrst_cnt <= 28'hFFFFFFF;
 	else if(mrst_cnt)          mrst_cnt <= mrst_cnt - 1'b1;
 
+	// Installed memory is sampled by POST and encoded into CMOS. Give a module
+	// change the same clean reset window as the explicit Reset menu action.
+	if(status[50:49] != old_ram_option) ram_rst_cnt <= 28'hFFFFFFF;
+	else if(ram_rst_cnt)                ram_rst_cnt <= ram_rst_cnt - 1'b1;
+
 	// one-shot: the request is consumed the moment the BIOS reads CMOS
 	// 7Bh (the INT19 decision at F000:813E) - without this the ~95 s
 	// window bleeds into the NEXT warm boot and every reboot inside it
@@ -898,7 +907,7 @@ always @(posedge clk_sys) begin
 
 	inject_f1      <= 1'b0;
 	bios_setup_req <= |setup_cnt;
-	menu_reset     <= |bios_rst_cnt | |mrst_cnt;
+	menu_reset     <= |bios_rst_cnt | |mrst_cnt | |ram_rst_cnt;
 end
 
 reg menu_reset;

@@ -40,7 +40,7 @@ module system
 	output        ps2_reset_n,
 
 	input   [5:0] bootcfg,
-	input         memcfg,
+	input   [1:0] ram_option,
 	output  [7:0] syscfg,
 
 	input         clk_uart1,
@@ -291,7 +291,8 @@ l2_cache cache
 	.PC110_FONT_BANK   (pc110_font_bank),
 	.PC110_FONT_SEG    (pc110_font_segment),
 	.PC110_FONT_EN     (pc110_font_enable),
-	.PC110_DRAM_CFG0   (pc110_dram_cfg0)
+	.PC110_DRAM_CFG0   (pc110_dram_cfg0),
+	.PC110_RAM_OPTION  (ram_option)
 );
 
 // A KBC-commanded reset (8042 FEh / output-port bit 0 / port 92h) resets
@@ -691,7 +692,7 @@ rtc rtc
 	.mgmt_write        (mgmt_write & mgmt_rtc_cs),
 	.mgmt_writedata    (mgmt_writedata[7:0]),
 
-	.memcfg            (memcfg),
+	.ram_option        (ram_option),
 	.bootcfg           ({bootcfg[5:2], bootcfg[1:0] ? bootcfg[1:0] : {~fdd0_inserted, fdd0_inserted}}),
 	.setup_req         (bios_setup_req),
 	.setup_ack         (rtc_setup_ack),

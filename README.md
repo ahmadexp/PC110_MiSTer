@@ -15,7 +15,8 @@ though, not every chip on the planar is modelled cycle-for-cycle. See
 
 * 486SX (no FPU) at a fixed 30 MHz, which is the closest match to the real
   machine I've been able to pin down so far
-* 20 MB RAM (4 MB on the planar plus the 16 MB expansion card)
+* selectable PC110 RAM module: none, 4 MB, 8 MB or 16 MB, giving 4 MB,
+  8 MB, 12 MB or 20 MB total; 16 MB remains the default
 * the full 256 KB PC110 flash mapped at C0000-FFFFF
 * VL82C420/SCAMP config ports and their unlock sequences
 * PCMCIA register file, font-ROM banking with the 1 MB Japanese font image,
@@ -104,6 +105,8 @@ then build Main the usual way in the arm toolchain container.
 * WIN+F12 opens the PC110 OSD. Plain F12 passes through as a normal PC key.
 * Mount a raw VHD at IDE 0-0 for the hard disk, and hit "Reset and apply HDD"
   after you change disks.
+* Changing the RAM Module setting automatically resets the machine. The OSD
+  shows both the module capacity and resulting total memory.
 * Loading the whole flash isn't redundant. Main's usual `boot1.rom` path only
   loads part of the image, but early PC110 POST wants all 256 KB up at
   C0000-FFFFF, so FC7 writes the full image to DDR and the split ROMs overlay

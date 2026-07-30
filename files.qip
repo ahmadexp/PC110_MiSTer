@@ -17,6 +17,7 @@ set_global_assignment -name VERILOG_FILE rtl/soc/ps2.v
 set_global_assignment -name VERILOG_FILE rtl/soc/rtc.v
 set_global_assignment -name VERILOG_FILE rtl/soc/vga.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/pc110/pc110_chipset.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/pc110/pc110_ram_config.sv
 set_global_assignment -name VERILOG_FILE rtl/system.v
 set_global_assignment -name VERILOG_FILE rtl/pc110/pc110_host_bridge.v
 set_global_assignment -name SDC_FILE PC110.sdc

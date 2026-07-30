@@ -58,6 +58,11 @@ module l2_cache #(parameter ADDRBITS = 24)
 	// address, and the expansion region does not respond.
 	input   [7:0] PC110_DRAM_CFG0,
 
+	// Installed expansion module. Encoding is shared with the OSD:
+	// 0 = 16 MB, 1 = none, 2 = 4 MB, 3 = 8 MB. The planar 4 MB is always
+	// present, giving total capacities of 20, 4, 8 and 12 MB respectively.
+	input   [1:0] PC110_RAM_OPTION,
+
 	// PC110 debug: pulse when POST writes its error log in the EBDA
 	// (count byte at phys 9FC17h, first code word at 9FC18h).  Fed to the
 	// chipset post-logger so the exact moment an error is logged is
@@ -257,8 +262,17 @@ wire vga_rgn = (CPU_ADDR[ADDRBITS+1:15] == 'h5)  && ((CPU_ADDR[14:13] & vga_mask
 wire shr_rgn = (CPU_ADDR[ADDRBITS+1:11] == 'h67) && shr_rgn_en;
 wire [ADDRBITS:0] pc110_font_addr =
 	25'h0400000 + {8'h00, PC110_FONT_BANK, 10'h000} + CPU_ADDR[10:1];
-// 20 MiB installed: 4 MiB planar RAM plus the 16 MiB expansion card.
-// CPU_ADDR is a 32-bit-word address, hence 20 MiB == 0x00500000.
+// CPU_ADDR is a 32-bit-word address. Select the physical end of installed
+// memory from the 4 MiB planar RAM and the chosen expansion module.
+wire [29:0] pc110_ram_limit;
+pc110_ram_config ram_config
+(
+	.ram_option(PC110_RAM_OPTION),
+	.word_limit(pc110_ram_limit),
+	.extmem_kb(),
+	.above16_64k(),
+	.checksum_sum()
+);
 // The upper-memory flash/shadow area and the banked font window remain
 // backed by DDR even though they are outside installed conventional RAM.
 //
@@ -302,7 +316,7 @@ wire pc110_ems_open = (CPU_ADDR[29:12] >= 18'h33) && (CPU_ADDR[29:12] <= 18'h36)
 	~shr_rgn;
 
 wire ram_rgn = (((CPU_ADDR < 30'h00100000) ||
-	((CPU_ADDR < 30'h00500000) && pc110_cfg_settled) ||
+	((CPU_ADDR < pc110_ram_limit) && pc110_cfg_settled) ||
 	pc110_upper_rgn) && ~pc110_ems_open) || pc110_font_rgn;
 
 wire [7:0] be64 = CPU_ADDR[0] ? {CPU_BE, 4'h0} : {4'h0, CPU_BE};
