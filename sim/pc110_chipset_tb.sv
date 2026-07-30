@@ -99,8 +99,33 @@ module pc110_chipset_tb;
 		// PCIC is visible without a gate and identifies both sockets.
 		write_port(16'h03E0, 8'h00);
 		expect_read(16'h03E1, 8'h83, "PCIC socket A ID");
+		write_port(16'h03E0, 8'h01);
+		expect_read(16'h03E1, 8'h3F, "PCIC socket A interface status");
 		write_port(16'h03E0, 8'h40);
 		expect_read(16'h03E1, 8'h83, "PCIC socket B ID");
+		write_port(16'h03E0, 8'h41);
+		expect_read(16'h03E1, 8'h33, "PCIC socket B interface status");
+		write_port(16'h03E0, 8'h8B);
+		write_port(16'h03E1, 8'hA5);
+		expect_read(16'h03E1, 8'hA5, "PCIC extended register");
+		write_port(16'h03E0, 8'h0B);
+		expect_read(16'h03E1, 8'h00, "PCIC extended index does not alias");
+		write_port(16'h03E0, 8'h56);
+		write_port(16'h03E1, 8'h20);
+		expect_read(16'h03E1, 8'h00, "PCIC software detect is write-only");
+		write_port(16'h03E0, 8'h44);
+		expect_read(16'h03E1, 8'h08, "PCIC card-detect change latch");
+		expect_read(16'h03E1, 8'h00, "PCIC change latch clears on read");
+
+		// PC110 LPT1 uses the historical 03BCh base.
+		write_port(16'h03BC, 8'hA5);
+		expect_read(16'h03BC, 8'hA5, "LPT data latch");
+		expect_read(16'h03BD, 8'hD0, "LPT ready status");
+		write_port(16'h03BE, 8'h05);
+		expect_read(16'h03BE, 8'hE5, "LPT control latch");
+		write_port(16'h03BE, 8'h04);
+		expect_read(16'h03BD, 8'h90, "LPT acknowledge pulse");
+		expect_read(16'h03BD, 8'hD0, "LPT acknowledge release");
 
 		// SCAMP runtime view stays hidden until the write-based gate.
 		write_port(16'h0074, 8'h7A);

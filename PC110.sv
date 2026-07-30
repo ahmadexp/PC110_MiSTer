@@ -522,15 +522,17 @@ always @(posedge clk_sys) cur_rate <= clk_rate[clk_req];
 
 ////////////////////////////  UART  //////////////////////////////////// 
 
-/// UART1
-
 wire uart1_cts, uart1_dcd, uart1_dsr, uart1_rts, uart1_dtr;
 wire uart1_tx, uart1_rx;
+wire uart2_cts, uart2_dcd, uart2_dsr, uart2_rts, uart2_dtr;
+wire uart2_tx, uart2_rx;
 wire pc110_postlog_tx;
 wire mpu_tx, mpu_rx;
 
 wire hps_mpu = (uart1_mode >= 3);
 
+// Match MiSTer's x86 UART topology. Main's UART "Modem" mode is attached
+// to COM1, where the PC110 internal-modem diagnostic sends AT<CR>.
 assign UART_RTS  = ~hps_mpu & uart1_rts;
 assign UART_DTR  = ~hps_mpu & uart1_dtr;
 assign uart1_cts = ~hps_mpu & UART_CTS;
@@ -538,14 +540,12 @@ assign uart1_dcd = ~hps_mpu & UART_DSR;
 assign uart1_dsr = ~hps_mpu & UART_DSR;
 assign uart1_rx  = ~hps_mpu & UART_RXD;
 assign mpu_rx    = ~hps_mpu ? midi_rx : UART_RXD;
-// The PC110 POST logger shares the UART TX line (both idle high); POST
-// codes stream out before any COM1 traffic exists.
-assign UART_TXD  = pc110_postlog_tx & (~hps_mpu ? uart1_tx : (mpu_tx & ~mt32_use));
-
-/// UART2
+assign UART_TXD  = pc110_postlog_tx &
+                   (~hps_mpu ? uart1_tx : (mpu_tx & ~mt32_use));
 
 wire user_io_mode = status[10];
 
+// COM2 remains available as the external serial port on USER I/O.
 assign USER_OUT = user_io_mode ? {1'b1, 1'b1, uart2_dtr, 1'b1, uart2_rts, uart2_tx, 1'b1} : mt32_out;
 
 //
@@ -560,12 +560,10 @@ assign USER_OUT = user_io_mode ? {1'b1, 1'b1, uart2_dtr, 1'b1, uart2_rts, uart2_
 // 6   | TX+      | I |DCD
 //
 
-wire uart2_tx, uart2_rts, uart2_dtr;
-
-wire uart2_rx  = ~user_io_mode | USER_IN[0];
-wire uart2_cts = ~user_io_mode | USER_IN[3];
-wire uart2_dsr = ~user_io_mode | USER_IN[5];
-wire uart2_dcd = ~user_io_mode | USER_IN[6];
+assign uart2_rx  = ~user_io_mode | USER_IN[0];
+assign uart2_cts = ~user_io_mode | USER_IN[3];
+assign uart2_dsr = ~user_io_mode | USER_IN[5];
+assign uart2_dcd = ~user_io_mode | USER_IN[6];
 
 ////////////////////////////  VIDEO  /////////////////////////////////// 
 

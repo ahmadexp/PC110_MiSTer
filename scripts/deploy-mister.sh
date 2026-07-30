@@ -44,6 +44,10 @@ fi
 ssh "${mister_host}" "printf '${remote_stage}/pc110_bios.bin\\0' > /media/fat/config/PC110.f7 && \
   if [ -f '${remote_stage}/pc110_font.bin' ]; then \
     printf '${remote_stage}/pc110_font.bin\\0' > /media/fat/config/PC110.f6; \
-  fi && sync"
+  fi && \
+  printf '\\004\\000\\000\\000' > /media/fat/config/uartmode.PC110 && \
+  printf '\\000\\302\\001\\000\\022\\172\\000\\000\\000\\113\\000\\000' \
+    > /media/fat/config/uartspeed.PC110 && \
+  sync"
 
 echo "Deployed ${remote_rbf}"

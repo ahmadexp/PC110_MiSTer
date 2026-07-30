@@ -29,15 +29,22 @@ if [[ -z "${build_host}" ]]; then
   exit 2
 fi
 
+# Quartus runs as root in the container, so remove its generated directories
+# through the same container before rsync encounters root-owned cache files.
+ssh "${build_host}" "mkdir -p '${build_dir}'; docker run --rm \
+  -v \"\$PWD/${build_dir}:/build\" -w /build '${quartus_image}' \
+  rm -rf db incremental_db output_files"
+
 # Sources only: the project files, RTL, and sim.  Build products, vendor
 # trees, and the unrelated Personaware-EN repository stay local.
 rsync -az --delete \
+  --exclude='db/' --exclude='incremental_db/' --exclude='output_files/' \
+  --exclude='Personaware-EN/' --exclude='upstream-*/' --exclude='artifacts/' \
   --include='*/' \
   --include='*.sv' --include='*.v' --include='*.vhd' --include='*.qip' \
   --include='*.qpf' --include='*.qsf' --include='*.sdc' --include='*.srf' \
   --include='*.tcl' --include='*.mif' --include='*.hex' --include='*.sh' \
   --exclude='*' \
-  --exclude='Personaware-EN/' --exclude='upstream-*/' --exclude='artifacts/' \
   "${repo_dir}/" "${build_host}:${build_dir}/"
 
 # Fast-iteration overrides.  Appended to the working-copy QSF so they win
@@ -60,9 +67,13 @@ set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL MINIMUM
 EOF"
 fi
 
-ssh "${build_host}" "cd '${build_dir}' && \
-  docker run --rm -v \"\$PWD:/build\" -w /build '${quartus_image}' \
-    quartus_sh --flow compile PC110.qpf > build.log 2>&1; \
+ssh "${build_host}" "set -e; cd '${build_dir}'; \
+  rm -rf db incremental_db; \
+  rm -f output_files/PC110.rbf output_files/PC110.sta.summary; \
+  if ! docker run --rm -v \"\$PWD:/build\" -w /build '${quartus_image}' \
+    quartus_sh --flow compile PC110.qpf > build.log 2>&1; then \
+    tail -40 build.log; exit 1; \
+  fi; \
   tail -3 build.log; test -s output_files/PC110.rbf"
 
 mkdir -p "${repo_dir}/artifacts"

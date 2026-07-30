@@ -48,3 +48,5 @@ c5_pin_model_dump.txt
 *.xml
 *_netlist
 *.cdf
+__pycache__/
+*.pyc

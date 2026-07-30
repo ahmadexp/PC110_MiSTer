@@ -71,6 +71,21 @@ wire io_wr = io_write & |present;
 // the master's DRDY for the absent slave, so the BIOS treats the slave as
 // present-but-failing and aborts the boot with a configuration error.
 wire sel_present = present[drv_addr[4]];
+// EXECUTE DEVICE DIAGNOSTIC is a controller-local ATA command. Complete it
+// in hardware so it cannot depend on an HPS round trip during diagnostics,
+// returning the result required by the PC110 Easy-Setup HDD-1 test:
+// ATA success diagnostic code (error register 01h), a ready task file, and
+// the command-completion interrupt expected by the PC110 diagnostic.
+wire local_diag_cmd = io_wr && io_address == 7 &&
+	(io_writedata[7:0] == 8'h90) && sel_present;
+wire local_seek_cmd = io_wr && io_address == 7 &&
+	(io_writedata[7:0] == 8'h70) && sel_present;
+// STANDBY IMMEDIATE is also entirely controller-local. Easy-Setup issues it
+// before EXECUTE DEVICE DIAGNOSTIC; forwarding it to Main makes the result
+// depend on an HPS round trip and used to leave ABRT set for the next phase.
+wire local_standby_cmd = io_wr && io_address == 7 &&
+	(io_writedata[7:0] == 8'hE3) && sel_present;
+wire local_quick_cmd = local_diag_cmd | local_seek_cmd | local_standby_cmd;
 
 always @(posedge clk) if(io_read) begin
 	if(!present) io_readdata <= 32'hFFFFFFFF;
@@ -114,6 +129,9 @@ reg [7:0] error;
 always @(posedge clk) begin
 	if(~rst_n)                               error <= 8'h00;
 	else if(sw_reset_done)                   error <= 8'h01;
+	else if(local_diag_cmd)                  error <= 8'h01;
+	else if(local_seek_cmd)                  error <= 8'h00;
+	else if(local_standby_cmd)               error <= 8'h00;
 	else if(mgmt_write && mgmt_address == 0) error <= mgmt_writedata[15:8];
 end
 
@@ -164,6 +182,7 @@ always @(posedge clk) begin
 	if(reset)                                status <= 8'h80;
 	else if(sw_reset_done)                   status <= 8'h40;
 	else if(mgmt_write && mgmt_address == 5) status <= {mgmt_writedata[15:14],1'b0,mgmt_writedata[12:11],2'b00,mgmt_writedata[8]};
+	else if(local_quick_cmd)                 status <= 8'h40;
 	else if(io_wr && io_address == 7)        status <= 8'h80;
 	else if(io_done & drq & last_read)       status <= 8'h40;
 	else if(io_done & drq)                   status <= 8'h80;
@@ -187,6 +206,7 @@ always @(posedge clk) begin
 	if(~rst_n)                               io_wait <= 1'd0;
 	else if(sw_reset)                        io_wait <= use_wait;
 	else if(mgmt_write && mgmt_address == 5) io_wait <= 1'd0;
+	else if(local_quick_cmd)                 io_wait <= 1'd0;
 	else if(io_wr && io_address == 7)        io_wait <= use_wait;
 	else if(io_done & drq)                   io_wait <= use_wait;
 end
@@ -200,6 +220,7 @@ end
 always @(posedge clk) begin
 	if(~rst_n)                               request <= 3'b110; // reset
 	else if(mgmt_write && mgmt_address == 5) request <= 3'b000;
+	else if(local_quick_cmd)                 request <= 3'b000;
 	else if(io_wr && io_address == 7)        request <= 3'b100; // new command
 	else if(io_done & drq & ~last_read)      request <= 3'b101; // data send/recv
 end
@@ -207,6 +228,7 @@ end
 always @(posedge clk) begin
 	if(reset)                                                                      irq <= 1'b0;
 	else if(mgmt_write && mgmt_address == 5 && mgmt_writedata[10] && ~disable_irq) irq <= 1'b1;
+	else if(local_quick_cmd && ~disable_irq)                                        irq <= 1'b1;
 	else if((io_read | io_wr) && io_address == 7)                                  irq <= 1'b0;
 end
 
