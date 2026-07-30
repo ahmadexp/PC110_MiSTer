@@ -33,9 +33,11 @@ scripts/check-release.sh
 
 The core advertises Main's standard `AO486` x86 service identity, so stock Main
 provides IDE mounting, CMOS injection and boot-ROM loading without any
-PC110-specific profile. Disk geometry is image-owned metadata: a 4 MiB PC110
-VHD has a same-basename `.cfg` containing `HEADS=2`, `SECTORS=32`, and
-`CYLINDERS=128`.
+PC110-specific profile. Disk geometry remains image-owned: the tested 4 MiB
+PersonaWare VHD's MBR and BPB already encode 2 heads and 32 sectors per track,
+so its same-basename `.cfg` declares `HEADS = 2`, `SECTORS = 32`, and
+`CYLINDERS = 128`. Metadata must match an image's existing CHS layout and must
+not be used to change it.
 
 The remaining upstream work is generic and not required to identify the core:
 

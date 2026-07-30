@@ -32,7 +32,9 @@ boot-ROM service. The `CONF_STR` service identifier is `AO486`, while the RBF
 filename remains `IBM PC110_<date>.rbf` for the core browser. Main therefore
 needs no PC110 name, profile or geometry branch.
 
-Hard-disk geometry belongs to the mounted image. A same-basename `.cfg` beside
-each VHD supplies `HEADS`, `SECTORS`, and optionally `CYLINDERS` through Main's
-existing VHD metadata parser. The optional patch in `scripts/main-patches` is a
-generic IDE correction kept separate for upstream review.
+Hard-disk geometry belongs to the mounted image. When needed, a same-basename
+`.cfg` supplies `HEADS`, `SECTORS`, and optionally `CYLINDERS` through Main's
+existing VHD metadata parser. These values must describe the geometry already
+encoded in the image's partition table and BPB; they must not replace it. The
+optional patch in `scripts/main-patches` is a generic IDE correction kept
+separate for upstream review.
