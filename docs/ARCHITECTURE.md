@@ -1,8 +1,8 @@
 # Architecture and dependency boundary
 
-PC110 is a standalone MiSTer machine core. Its core name, project files,
-configuration, ROM directory, chipset policy, memory map and release artifact
-are all PC110-specific.
+PC110 is a standalone MiSTer machine core. Its project files, chipset policy,
+memory map and browser-visible release artifact are PC110-specific. It uses the
+standard AO486 service identity at the MiSTer Main boundary.
 
 ## PC110-owned implementation
 
@@ -10,7 +10,7 @@ are all PC110-specific.
 - `rtl/pc110/pc110_chipset.sv`
 - `rtl/pc110/pc110_host_bridge.v`
 - PC110 flash, font, shadow-memory and selectable 4/8/12/20 MiB memory mapping
-- PC110 CMOS values, Easy-Setup entry and machine-specific storage profile
+- PC110 CMOS values, Easy-Setup entry and image-declared storage geometry
 - PC110 simulations, ROM preparation and deployment
 
 ## Reused open-source implementation
@@ -28,14 +28,11 @@ ES488 models.
 ## MiSTer Main boundary
 
 The host bridge uses Main's shared x86 DMA protocol for floppy, IDE, CMOS and
-boot-ROM service. Main integration is represented by the reviewable patch
-series in `scripts/main-patches`.
+boot-ROM service. The `CONF_STR` service identifier is `AO486`, while the RBF
+filename remains `IBM PC110_<date>.rbf` for the core browser. Main therefore
+needs no PC110 name, profile or geometry branch.
 
-The PC110 patch adds a distinct `X86_PROFILE_PC110`. Machine-specific disk
-geometry is selected by that profile, and PC110 uses only its own game and
-configuration directories. Generic IDE protocol fixes are kept in separate
-patches for upstream review.
-
-Longer term, Main's name-to-profile table could be replaced by a capability
-declared by the core. That would improve extensibility, but it is not necessary
-for PC110 to remain a distinct machine.
+Hard-disk geometry belongs to the mounted image. A same-basename `.cfg` beside
+each VHD supplies `HEADS`, `SECTORS`, and optionally `CYLINDERS` through Main's
+existing VHD metadata parser. The optional patch in `scripts/main-patches` is a
+generic IDE correction kept separate for upstream review.

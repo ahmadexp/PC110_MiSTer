@@ -205,10 +205,10 @@ led fdd_led(clk_sys, |mgmt_req[7:6], LED_USER);
 `include "build_id.v"
 localparam CONF_STR =
 {
-	// The PC110 identifier requires a Main binary whose is_x86() check
-	// recognizes it; Main uses this identifier to load boot0.rom and
-	// boot1.rom from games/PC110 into the x86 UMA before releasing reset.
-	"PC110;UART115200:4000000(Turbo 115200),MIDI;",
+	// Advertise Main's standard x86 service identity. The RBF filename remains
+	// IBM PC110 for the core browser; AO486 here selects stock Main's shared
+	// IDE, CMOS and boot-ROM transport without a machine-specific Main profile.
+	"AO486;UART115200:4000000(Turbo 115200),MIDI;",
 	"S0,IMGIMAVFD,Floppy A:;",
 	"S1,IMGIMAVFD,Floppy B:;",
 	"O12,Write Protect,None,A:,B:,A: & B:;",

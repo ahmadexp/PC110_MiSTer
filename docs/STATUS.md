@@ -53,11 +53,13 @@ Two important corrections follow from that rule:
 
 ## Core identity and Main support
 
-The core identifies itself as `PC110`. MiSTer Main supplies a shared x86
-transport for IDE image mounting, CMOS injection and boot-ROM loading. The
-series in `scripts/main-patches` adds a distinct `X86_PROFILE_PC110`.
-Machine-specific geometry is isolated in the profile, while the IDE behavior
-corrections are separate generic patches suitable for upstream review.
+The RBF is named `IBM PC110_<date>.rbf` for the MiSTer browser. Its internal
+service identifier is `AO486`, allowing stock Main to supply the shared x86
+transport for IDE image mounting, CMOS injection and boot-ROM loading. Main has
+no PC110 profile or geometry branch. Each VHD supplies native geometry through
+a same-basename `.cfg`; the 4 MiB PersonaWare image uses 2 heads, 32 sectors
+per track and 128 cylinders. The remaining Main patch contains generic ATA
+responses suitable for independent upstream review.
 
 A December 2024 upstream prefetch-reset correction (`be9b103`) is retained in
 `rtl/ao486/memory/prefetch.v`.
@@ -201,16 +203,17 @@ Hardware evidence:
 - patched PersonaWare VHD SHA-256:
   `625a377d45efa98b8ef5506b91fbbc9c4899938d6dbd500203a7a794f913eba4`
 - release RBF SHA-256:
-  `1f7a5a83301121b9bc57ac67d4f2fd8ae712fa874a830d68135ee87a7b174e76`
-- full Quartus timing build: worst setup slack `+0.530 ns`, worst hold slack
-  `+0.245 ns`, and zero TNS in every reported domain
-- current patched Main SHA-256:
-  `b784bf841164c7254da6b7ac0de0964a9d113f7e28ea76318d25df0edc8a6398`
+  `468ef3fd5fc7d8dc0e4224eb8b99633075a782cb083ada025633a21b7b2cb332`
+- full Quartus timing build: worst setup slack `+0.361 ns`, worst hold slack
+  `+0.252 ns`, and zero TNS in every reported domain
+- current Main plus generic ATA patch SHA-256:
+  `94932c06d4091eca7d99bd427578963839aedd4e1b92dfd211b82de5d50c0abb`
 - 29 July 2026 hardware verification on two DE10-Nano MiSTer systems: both
-  reported `CORE=PC110`, EBDA error count/code `00h/0000h`, and booted
-  PersonaWare with working storage and video
+  reported `CORE=AO486`, used image metadata with 2 heads, 32 sectors and 128
+  cylinders, returned EBDA error count/code `00h/0000h`, and booted PersonaWare
+  with working storage and video
 - current MiSTer framework release verified on both boards: each on-device RBF
-  matched the release SHA, reported `CORE=PC110`, and reached PersonaWare at
+  matched the release SHA, reported `CORE=AO486`, and reached PersonaWare at
   native 640x480
 - a PID change after `/dev/MiSTer_cmd` `load_core` is expected: current Main
   deliberately restarts itself after loading any RBF via `app_restart()`
