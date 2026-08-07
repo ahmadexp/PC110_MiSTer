@@ -1,6 +1,7 @@
 db
 greybox_tmp
 Personaware-EN/
+/dist/
 .DS_Store
 incremental_db
 output_files

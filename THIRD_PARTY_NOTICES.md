@@ -6,8 +6,16 @@ headers. In particular, the 486 CPU RTL retains Aleksander Osman's BSD
 license terms reproduced below. MiSTer framework and shared x86-derived
 files retain their upstream GPL notices.
 
-No IBM BIOS, font ROM, operating-system image, or other proprietary
-firmware is included in this repository or its releases.
+No IBM BIOS, font ROM, or other proprietary firmware is included in this
+repository or its releases.
+
+The optional MiSTer-ready convenience bundle includes the separately
+maintained PersonaWare English 2.0.6 disk image from
+https://github.com/ahmadexp/Personaware-English. That image contains IBM
+software and is not covered by this FPGA core's GPL license. IBM trademarks
+and software remain the property of their respective owner. Users are
+responsible for ensuring that their possession and use of the image are
+permitted in their jurisdiction.
 
 ## BSD-licensed CPU RTL
 
