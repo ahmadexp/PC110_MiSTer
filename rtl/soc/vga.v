@@ -76,7 +76,8 @@ module vga
 	output reg [10:0]   vga_height,
 	output reg  [3:0]   vga_flags,
 	
-	input               vga_lores
+	input               vga_lores,
+	input               pc110_easysetup_palette
 );
 
 wire io_b_read  = io_read  & io_b_cs;
@@ -1451,10 +1452,43 @@ reg vgareg_blank_n;
 always @(posedge clk_vga) if (ce_video) vgareg_blank_n <= ~(vgaprep_blank|vgaprep_overscan);
 always @(posedge clk_vga) if (ce_video) vga_blank_n <= vgareg_blank_n;
 
+// The PC110's Easy-Setup artwork is four-plane VGA data, but the internal
+// F65535 flat-panel path displays a PC110-specific palette rather than the
+// generic VGA DAC colors. Preserve the planar color index through the two
+// palette RAM stages so the LCD colors remain aligned with the output pixel.
+reg [3:0] pc110_palette_index_d1;
+reg [3:0] pc110_palette_index_d2;
+reg       pc110_easysetup_palette_meta;
+reg       pc110_easysetup_palette_vga;
+
+always @(posedge clk_vga) begin
+	pc110_easysetup_palette_meta <= pc110_easysetup_palette;
+	pc110_easysetup_palette_vga  <= pc110_easysetup_palette_meta;
+	if(ce_video) begin
+		pc110_palette_index_d1 <= pel_after_panning[3:0];
+		pc110_palette_index_d2 <= pc110_palette_index_d1;
+	end
+end
+
+reg [23:0] pc110_easysetup_rgb;
+always @(*) begin
+	pc110_easysetup_rgb = { dac_color[17:12], dac_color[17:16],
+	                       dac_color[11:6],  dac_color[11:10],
+	                       dac_color[5:0],   dac_color[5:4] };
+	case(pc110_palette_index_d2)
+		4'h0: pc110_easysetup_rgb = 24'h000000;
+		4'h3: pc110_easysetup_rgb = 24'hB89183; // mauve panel
+		4'h5: pc110_easysetup_rgb = 24'h700507; // maroon icons/selection
+		4'h6: pc110_easysetup_rgb = 24'h0A0533; // dark blue text
+		4'hF: pc110_easysetup_rgb = 24'hF9F9F9; // warm white tiles
+		default: ;
+	endcase
+end
+
 always @(posedge clk_vga) if (ce_video) begin
-	vga_r <= output_enable ? { dac_color[17:12], dac_color[17:16] } : 8'd0;
-	vga_g <= output_enable ? { dac_color[11:6],  dac_color[11:10] } : 8'd0;
-	vga_b <= output_enable ? { dac_color[5:0],   dac_color[5:4]   } : 8'd0;
+	vga_r <= output_enable ? (pc110_easysetup_palette_vga ? pc110_easysetup_rgb[23:16] : { dac_color[17:12], dac_color[17:16] }) : 8'd0;
+	vga_g <= output_enable ? (pc110_easysetup_palette_vga ? pc110_easysetup_rgb[15:8]  : { dac_color[11:6],  dac_color[11:10] }) : 8'd0;
+	vga_b <= output_enable ? (pc110_easysetup_palette_vga ? pc110_easysetup_rgb[7:0]   : { dac_color[5:0],   dac_color[5:4]   }) : 8'd0;
 end
 
 reg ce_div3;
