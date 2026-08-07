@@ -43,7 +43,7 @@ rsync -az --delete \
   --include='*/' \
   --include='*.sv' --include='*.v' --include='*.vhd' --include='*.qip' \
   --include='*.qpf' --include='*.qsf' --include='*.sdc' --include='*.srf' \
-  --include='*.tcl' --include='*.mif' --include='*.hex' --include='*.sh' \
+  --include='*.tcl' --include='*.mif' --include='*.mem' --include='*.hex' --include='*.sh' \
   --exclude='*' \
   "${repo_dir}/" "${build_host}:${build_dir}/"
 

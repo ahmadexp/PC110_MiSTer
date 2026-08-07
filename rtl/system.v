@@ -237,6 +237,7 @@ wire [7:0] pc110_errlog_byte;
 wire       pc110_kbd_hide;
 wire       pc110_ckpt_boot;
 wire       pc110_easysetup_remap;
+reg        pc110_easysetup_palette_active;
 wire       rtc_setup_ack;
 // only the INT19 boot-decision read (checkpoint 6Eh onward) consumes the
 // setup request; earlier incidental CMOS 7Bh reads must not.
@@ -310,6 +311,17 @@ always @(posedge clk_sys) begin
 	else if(kbc_cpu_rst_cnt != 8'd0)      kbc_cpu_rst_cnt <= kbc_cpu_rst_cnt - 8'd1;
 end
 wire kbc_cpu_reset = (kbc_cpu_rst_cnt != 8'd0);
+
+// easysetup_remap is asserted while the BIOS exposes its unpacked setup
+// image, but it drops again before the VGA frame is displayed. Keep the
+// PC110 LCD palette selected for the rest of that setup session. A machine
+// or keyboard-controller reset clears it before the next normal boot.
+always @(posedge clk_sys) begin
+	if(reset || kbc_cpu_reset)
+		pc110_easysetup_palette_active <= 1'b0;
+	else if(pc110_easysetup_remap)
+		pc110_easysetup_palette_active <= 1'b1;
+end
 
 ao486 ao486
 (
@@ -847,6 +859,7 @@ vga vga
 	.vga_stride        (video_stride),
 	.vga_off           (video_off),
 	.vga_lores         (video_lores),
+	.pc110_easysetup_palette(pc110_easysetup_palette_active),
 
 	.irq               (irq_2)
 );

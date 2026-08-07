@@ -22,6 +22,8 @@ though, not every chip on the planar is modelled cycle-for-cycle. See
 * PCMCIA register file, font-ROM banking with the 1 MB Japanese font image,
   the inking port and both EC windows
 * IDE, floppy, VGA, keyboard and mouse through the shared PC-compatible blocks
+* PC110-specific IBM Easy-Setup LCD colors, matched to the real-hardware
+  reference palette documented by PC110-EMU
 * COM1/internal-modem transport through MiSTer Main, with a PC110-specific
   19,200-baud profile
 * PC110 CMOS layout
@@ -35,7 +37,7 @@ mattered got checked on the metal.
 ## Screenshots
 
 IBM Easy-Setup, running straight off the flash image with working keyboard
-navigation:
+navigation and the hardware-matched mauve, maroon and dark-blue LCD palette:
 
 ![Easy-Setup](docs/images/ibm-pc110-easy-setup.png)
 
@@ -69,6 +71,10 @@ Quartus 17.0.2 in the raetro container, same as the rest of the cores:
 
     scripts/test.sh
     scripts/build.sh
+
+To build on a separate Quartus host over SSH:
+
+    BUILD_HOST=user@quartus-builder scripts/build-remote.sh
 
 The bitstream ends up in `artifacts/PC110.rbf`. Set `DOCKER_BIN`,
 `DOCKER_CONTEXT` or `QUARTUS_IMAGE` if your setup needs it. There's a
