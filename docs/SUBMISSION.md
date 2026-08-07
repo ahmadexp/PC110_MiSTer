@@ -14,7 +14,8 @@ firmware.
 - dated release bitstream under `releases`
 - browser-visible release name: `IBM PC110_<date>.rbf`
 - standard x86 service identity and Home folder: `AO486` / `games/ao486`
-- no IBM BIOS, font ROM, operating-system image, or VHD tracked or released
+- no IBM BIOS, font ROM, operating-system image, or VHD tracked in the core
+  source or included in the core-only submission artifact
 - self-checking chipset testbench in GitHub Actions
 
 The framework migration is based on MiSTer-devel/Template_MiSTer commit
@@ -63,6 +64,11 @@ The full Quartus 17.0.2 build completed with worst setup slack `+0.361 ns`,
 worst hold slack `+0.252 ns`, and zero TNS in every reported domain. Both
 boards reported `/tmp/CORENAME=AO486`, EBDA error count/code `00h/0000h`, and
 reached PersonaWare using the 2/32/128 VHD metadata.
+
+The public MiSTer-ready convenience bundle is separate from the core-only
+submission artifact. It adds the independently maintained PersonaWare English
+VHD but still excludes IBM BIOS and font ROM files. MiSTer maintainers can use
+the dated RBF and source release without downloading that convenience bundle.
 
 ## Maintainer handoff
 

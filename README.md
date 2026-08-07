@@ -11,6 +11,23 @@ desktop with the keyboard and Japanese text working. Still a work in progress
 though, not every chip on the planar is modelled cycle-for-cycle. See
 [docs/STATUS.md](docs/STATUS.md) for what's verified and what's left.
 
+## MiSTer-ready download
+
+The [latest GitHub release](https://github.com/ahmadexp/PC110_MiSTer/releases/latest)
+includes `IBM-PC110-MiSTer-Ready-20260806.zip`, a backup-first package laid out
+for a standard MiSTer SD card. It contains the verified core, PersonaWare
+English 2.0.6 VHD, matching 2/32/128 CHS metadata, installer, ROM preparation
+tool, checksums, licenses, and notices.
+
+IBM BIOS and font ROM files are not included. Prepare dumps from hardware you
+own with `tools/prepare-roms.sh`, copy the results to `games/ao486`, then run
+the package's `install.sh` on MiSTer. Existing core, VHD, metadata, and ROM
+selector files are backed up before replacement.
+
+```text
+dc7b1572aaa34b617675e8655f789e9fa2ca4929ca052fc579c229e7ca737a05  IBM-PC110-MiSTer-Ready-20260806.zip
+```
+
 ## What works
 
 * 486SX (no FPU) at a fixed 30 MHz, which is the closest match to the real
@@ -45,7 +62,8 @@ PersonaWare V1.0 after an unattended boot:
 
 ## ROMs
 
-No IBM firmware ships with this repo, you supply your own dump.
+No IBM firmware ships with this repo or the MiSTer-ready bundle; you supply
+your own dump.
 
 You need the PC110 BIOS flash (IBM 39H4551, 262144 bytes):
 
