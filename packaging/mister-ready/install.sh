@@ -14,6 +14,11 @@ if ! command -v sha256sum >/dev/null 2>&1; then
   echo "error: sha256sum is required" >&2
   exit 1
 fi
+if ! strings "${fat_root}/MiSTer" 2>/dev/null | grep -qx PC110; then
+  echo "error: installed MiSTer Main does not recognize the PC110 x86 variant" >&2
+  echo "       update Main to a version containing Main_MiSTer#1272 first" >&2
+  exit 1
+fi
 
 cd "${package_dir}"
 sha256sum -c PAYLOAD.sha256
@@ -55,18 +60,40 @@ install_payload() {
   fi
 }
 
-install_payload "_Computer/IBM PC110_20260729.rbf"
-install_payload "games/ao486/Personaware-disk.vhd"
-install_payload "games/ao486/Personaware-disk.cfg"
+# Remove duplicate menu entries only after copying every old PC110 RBF into
+# the timestamped backup directory.
+for existing_core in "${fat_root}/_Computer/IBM PC110"*.rbf \
+                     "${fat_root}/_Computer/PC110_"*.rbf; do
+  if [ ! -e "${existing_core}" ]; then
+    continue
+  fi
+  existing_relative=${existing_core#"${fat_root}/"}
+  backup_existing "${existing_relative}"
+  rm -f "${existing_core}"
+done
 
-mkdir -p "${fat_root}/config" "${fat_root}/games/ao486"
+install_payload "_Computer/IBM PC110_20260808.rbf"
+install_payload "games/PC110/Personaware-disk.vhd"
+install_payload "games/PC110/Personaware-disk.cfg"
 
-bios_path="${fat_root}/games/ao486/pc110_bios.bin"
-font_path="${fat_root}/games/ao486/pc110_font.bin"
+mkdir -p "${fat_root}/config" "${fat_root}/games/PC110"
+
+# Migrate only explicitly PC110-named assets from the former AO486 Home. This
+# leaves a normal AO486 installation and all of its configuration untouched.
+for asset in pc110_bios.bin pc110_font.bin boot0.rom boot1.rom; do
+  old_asset="${fat_root}/games/ao486/${asset}"
+  new_asset="${fat_root}/games/PC110/${asset}"
+  if [ ! -e "${new_asset}" ] && [ -s "${old_asset}" ]; then
+    cp "${old_asset}" "${new_asset}"
+  fi
+done
+
+bios_path="${fat_root}/games/PC110/pc110_bios.bin"
+font_path="${fat_root}/games/PC110/pc110_font.bin"
 if [ -s "${bios_path}" ]; then
-  backup_existing "config/AO486.f7"
-  printf '%s\0' "${bios_path}" > "${fat_root}/config/AO486.f7.pc110-new"
-  mv "${fat_root}/config/AO486.f7.pc110-new" "${fat_root}/config/AO486.f7"
+  backup_existing "config/PC110.f7"
+  printf '%s\0' "${bios_path}" > "${fat_root}/config/PC110.f7.pc110-new"
+  mv "${fat_root}/config/PC110.f7.pc110-new" "${fat_root}/config/PC110.f7"
   echo "Configured the existing PC110 BIOS image."
 else
   echo "warning: ${bios_path} is missing" >&2
@@ -74,17 +101,38 @@ else
 fi
 
 if [ -s "${font_path}" ]; then
-  backup_existing "config/AO486.f6"
-  printf '%s\0' "${font_path}" > "${fat_root}/config/AO486.f6.pc110-new"
-  mv "${fat_root}/config/AO486.f6.pc110-new" "${fat_root}/config/AO486.f6"
+  backup_existing "config/PC110.f6"
+  printf '%s\0' "${font_path}" > "${fat_root}/config/PC110.f6.pc110-new"
+  mv "${fat_root}/config/PC110.f6.pc110-new" "${fat_root}/config/PC110.f6"
   echo "Configured the existing PC110 font ROM image."
 fi
+
+# Main's x86 configuration is a version word followed by six 1024-byte image
+# paths. On a new installation, preselect PersonaWare as IDE 0-0 (slot 2).
+if [ ! -s "${fat_root}/config/PC110sys.cfg" ]; then
+  config_tmp="${fat_root}/config/PC110sys.cfg.pc110-new"
+  dd if=/dev/zero of="${config_tmp}" bs=6148 count=1 2>/dev/null
+  printf '\003\000\000\000' | dd of="${config_tmp}" bs=1 seek=0 conv=notrunc 2>/dev/null
+  printf 'games/PC110/Personaware-disk.vhd\0' | \
+    dd of="${config_tmp}" bs=1 seek=2052 conv=notrunc 2>/dev/null
+  mv "${config_tmp}" "${fat_root}/config/PC110sys.cfg"
+fi
+
+backup_existing "config/uartmode.PC110"
+printf '\004\000\000\000' > "${fat_root}/config/uartmode.PC110.pc110-new"
+mv "${fat_root}/config/uartmode.PC110.pc110-new" \
+  "${fat_root}/config/uartmode.PC110"
+backup_existing "config/uartspeed.PC110"
+printf '\000\302\001\000\022\172\000\000\000\113\000\000' \
+  > "${fat_root}/config/uartspeed.PC110.pc110-new"
+mv "${fat_root}/config/uartspeed.PC110.pc110-new" \
+  "${fat_root}/config/uartspeed.PC110"
 
 sync
 echo
 echo "IBM PC110 MiSTer package installed."
-echo "Core: /media/fat/_Computer/IBM PC110_20260729.rbf"
-echo "Disk: /media/fat/games/ao486/Personaware-disk.vhd"
+echo "Core: /media/fat/_Computer/IBM PC110_20260808.rbf"
+echo "Disk: /media/fat/games/PC110/Personaware-disk.vhd"
 if [ -d "${backup_dir}" ]; then
   echo "Replaced files were backed up under ${backup_dir}"
 fi

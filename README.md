@@ -14,18 +14,18 @@ though, not every chip on the planar is modelled cycle-for-cycle. See
 ## MiSTer-ready download
 
 The [latest GitHub release](https://github.com/ahmadexp/PC110_MiSTer/releases/latest)
-includes `IBM-PC110-MiSTer-Ready-20260806.zip`, a backup-first package laid out
+includes `IBM-PC110-MiSTer-Ready-20260808.zip`, a backup-first package laid out
 for a standard MiSTer SD card. It contains the verified core, PersonaWare
 English 2.0.6 VHD, matching 2/32/128 CHS metadata, installer, ROM preparation
 tool, checksums, licenses, and notices.
 
 IBM BIOS and font ROM files are not included. Prepare dumps from hardware you
-own with `tools/prepare-roms.sh`, copy the results to `games/ao486`, then run
+own with `tools/prepare-roms.sh`, copy the results to `games/PC110`, then run
 the package's `install.sh` on MiSTer. Existing core, VHD, metadata, and ROM
 selector files are backed up before replacement.
 
 ```text
-dc7b1572aaa34b617675e8655f789e9fa2ca4929ca052fc579c229e7ca737a05  IBM-PC110-MiSTer-Ready-20260806.zip
+1cc78a3c2da0d87c3b424c81183613015a9864737d8c76e55b5a24ea3f2f5f46  IBM-PC110-MiSTer-Ready-20260808.zip
 ```
 
 ## What works
@@ -101,18 +101,22 @@ hardware-tested build under [releases/](releases) if you'd rather not compile.
 ## Installing
 
 Copy the RBF into `_Computer` and drop `pc110_bios.bin` (and `pc110_font.bin`
-if you have it) into `games/ao486`. If you can SSH into your MiSTer this does
+if you have it) into `games/PC110`. If you can SSH into your MiSTer this does
 the lot:
 
     MISTER_HOST=root@mister.local scripts/deploy-mister.sh
 
 The deploy script installs the RBF as `IBM PC110_<date>.rbf`, so the MiSTer core
-browser shows **IBM PC110**. Internally the core advertises the standard
-`AO486` x86 service identity. This lets stock Main provide IDE, CMOS and
-boot-ROM services without a PC110-specific machine profile. Consequently
-`/tmp/CORENAME`, the Home folder, saved OSD state and remembered file paths use
-the AO486 name. Back up an existing ao486 setup before installing PC110 ROMs or
-configuration on the same SD card.
+browser shows **IBM PC110**. Internally the core advertises `PC110`, which Main
+recognizes as an x86 variant. Main still provides its existing IDE, CMOS and
+boot-ROM implementation without a PC110 machine profile, while `/tmp/CORENAME`,
+the Home folder, saved OSD state, mounted disks and UART configuration remain
+separate from AO486.
+
+This release requires a Main version containing
+[Main_MiSTer#1272](https://github.com/MiSTer-devel/Main_MiSTer/pull/1272).
+The installer and deployment script check for that support before installing
+the PC110-identity core.
 
 ### Hard-disk geometry
 
@@ -141,10 +145,13 @@ values onto an arbitrary image. A copyable, image-specific example is in
 
 ### Main integration
 
-Stock Main provides the required x86 transport. The optional patch series in
-`scripts/main-patches` contains only generic ATA diagnostic/read-verify command
-handling. It neither identifies PC110 nor overrides image geometry. The work is
-under review as
+Main provides the required shared x86 transport. The small compatibility patch
+in `scripts/main-patches` recognizes `PC110` as an x86 variant, following the
+existing PCXT variant pattern. It adds no machine profile and does not override
+image geometry. The change is under review as
+[Main_MiSTer#1272](https://github.com/MiSTer-devel/Main_MiSTer/pull/1272).
+
+The generic ATA diagnostic/read-verify improvements were merged separately as
 [Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252).
 
     scripts/apply-main-patches.sh /path/to/Main_MiSTer

@@ -4,10 +4,10 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 personaware_image="${1:-}"
 output_dir="${2:-${repo_dir}/dist}"
-bundle_date=20260806
+bundle_date=20260808
 bundle_name="IBM-PC110-MiSTer-Ready-${bundle_date}"
-core_source="${repo_dir}/releases/PC110_20260729.rbf"
-expected_core_sha=468ef3fd5fc7d8dc0e4224eb8b99633075a782cb083ada025633a21b7b2cb332
+core_source="${repo_dir}/releases/PC110_20260808.rbf"
+expected_core_sha=19df353c0986874ddf2abbd7cd1163292712f04a4283a6e104d7a16080b37e9c
 expected_vhd_sha=bb080741f5aac4a6cf9a47672a496c64ab4e332cd7e8535ce9d658e5707867e0
 
 if [[ -z "${personaware_image}" ]]; then
@@ -45,16 +45,18 @@ stage_root=$(mktemp -d -t pc110-mister-package.XXXXXX)
 trap 'rm -rf "${stage_root}"' EXIT
 package_root="${stage_root}/${bundle_name}"
 mkdir -p "${package_root}/payload/_Computer" \
-  "${package_root}/payload/games/ao486" "${package_root}/tools"
+  "${package_root}/payload/games/PC110" "${package_root}/tools"
 
 cp "${repo_dir}/packaging/mister-ready/install.sh" "${package_root}/install.sh"
 cp "${repo_dir}/packaging/mister-ready/README.txt" "${package_root}/README.txt"
 cp "${repo_dir}/scripts/prepare-roms.sh" "${package_root}/tools/prepare-roms.sh"
+cp "${repo_dir}/scripts/migrate-pc110-identity.sh" \
+  "${package_root}/tools/migrate-pc110-identity.sh"
 cp "${repo_dir}/LICENSE" "${repo_dir}/THIRD_PARTY_NOTICES.md" "${package_root}/"
-cp "${core_source}" "${package_root}/payload/_Computer/IBM PC110_20260729.rbf"
-cp "${personaware_image}" "${package_root}/payload/games/ao486/Personaware-disk.vhd"
+cp "${core_source}" "${package_root}/payload/_Computer/IBM PC110_20260808.rbf"
+cp "${personaware_image}" "${package_root}/payload/games/PC110/Personaware-disk.vhd"
 cp "${repo_dir}/examples/personaware-4mib.cfg" \
-  "${package_root}/payload/games/ao486/Personaware-disk.cfg"
+  "${package_root}/payload/games/PC110/Personaware-disk.cfg"
 
 (
   cd "${package_root}"
@@ -76,7 +78,7 @@ import zipfile
 
 root = Path(sys.argv[1])
 output = Path(sys.argv[2])
-timestamp = (2026, 8, 6, 0, 0, 0)
+timestamp = (2026, 8, 8, 0, 0, 0)
 with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
     for source in sorted(path for path in root.rglob("*") if path.is_file()):
         relative = source.relative_to(root.parent).as_posix()
@@ -107,8 +109,8 @@ with zipfile.ZipFile(archive_path) as archive:
     if len(roots) != 1:
         raise SystemExit("package must contain one top-level directory")
     root = next(iter(roots))
-    core = archive.read(f"{root}/payload/_Computer/IBM PC110_20260729.rbf")
-    vhd = archive.read(f"{root}/payload/games/ao486/Personaware-disk.vhd")
+    core = archive.read(f"{root}/payload/_Computer/IBM PC110_20260808.rbf")
+    vhd = archive.read(f"{root}/payload/games/PC110/Personaware-disk.vhd")
     if hashlib.sha256(core).hexdigest() != expected_core:
         raise SystemExit("packaged core failed checksum verification")
     if hashlib.sha256(vhd).hexdigest() != expected_vhd:

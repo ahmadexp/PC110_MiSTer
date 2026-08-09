@@ -32,3 +32,5 @@ iverilog -g2012 -Wall \
   "${repo_dir}/sim/pc110_ram_config_tb.sv"
 
 vvp "${build_dir}/pc110_ram_config_tb"
+
+"${repo_dir}/scripts/test-identity-migration.sh"

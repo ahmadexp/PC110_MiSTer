@@ -32,37 +32,35 @@ scripts/check-release.sh
 
 ## Main integration
 
-The core advertises Main's standard `AO486` x86 service identity, so stock Main
-provides IDE mounting, CMOS injection and boot-ROM loading without any
-PC110-specific profile. Disk geometry remains image-owned: the tested 4 MiB
-PersonaWare VHD's MBR and BPB already encode 2 heads and 32 sectors per track,
-so its same-basename `.cfg` declares `HEADS = 2`, `SECTORS = 32`, and
-`CYLINDERS = 128`. Metadata must match an image's existing CHS layout and must
-not be used to change it.
+The core advertises `PC110` as its x86 service identity. Main pull request
+[1272](https://github.com/MiSTer-devel/Main_MiSTer/pull/1272) recognizes that
+name as an x86 variant, retaining Main's standard IDE mounting, CMOS injection
+and boot-ROM loading while giving PC110 its own Home directory and persistent
+configuration. Disk geometry remains image-owned: the tested 4 MiB PersonaWare
+VHD's MBR and BPB already encode 2 heads and 32 sectors per track, so its
+same-basename `.cfg` declares `HEADS = 2`, `SECTORS = 32`, and `CYLINDERS =
+128`. Metadata must match an image's existing CHS layout and must not be used
+to change it.
 
-The remaining upstream work is generic and not required to identify the core:
-
-- [Main_MiSTer pull request 1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252)
-- [merged independent Main build fix 1253](https://github.com/MiSTer-devel/Main_MiSTer/pull/1253)
-
-Pull request 1252 adds ATA diagnostic/read-verify behavior useful to system
-BIOSes. Pull request 1253 is an already-merged independent legacy-toolchain
-build fix. Neither change selects PC110 geometry or adds a PC110 name to Main.
+The independent ATA diagnostic/read-verify improvement in Main pull request
+[1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252) remains useful to
+system BIOSes, but is separate from the PC110 identity change.
 
 ## Hardware acceptance evidence
 
 The release candidate is tested on two independent DE10-Nano MiSTer systems.
-Both systems must report `/tmp/CORENAME` as `AO486`, complete IBM BIOS POST
+Both systems must report `/tmp/CORENAME` as `PC110`, complete IBM BIOS POST
 without an EBDA error, and reach the PersonaWare desktop from the same release
 RBF. Native screenshots and local build reports are retained as test artifacts;
 only redistributable screenshots are committed.
 
-Release `PC110_20260729.rbf` passed this regression on both systems. Its
+The earlier release `PC110_20260729.rbf` passed this regression on both systems. Its
 SHA-256 is
 `468ef3fd5fc7d8dc0e4224eb8b99633075a782cb083ada025633a21b7b2cb332`.
 The full Quartus 17.0.2 build completed with worst setup slack `+0.361 ns`,
 worst hold slack `+0.252 ns`, and zero TNS in every reported domain. Both
-boards reported `/tmp/CORENAME=AO486`, EBDA error count/code `00h/0000h`, and
+boards reported the former `/tmp/CORENAME=AO486` compatibility identity, EBDA
+error count/code `00h/0000h`, and
 reached PersonaWare using the 2/32/128 VHD metadata.
 
 The public MiSTer-ready convenience bundle is separate from the core-only
