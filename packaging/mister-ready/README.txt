@@ -6,24 +6,25 @@ PersonaWare English 2.0.6 disk image onto a standard MiSTer SD card.
 
 INCLUDED
 
-  * IBM PC110_20260729.rbf
+  * IBM PC110_20260808.rbf
   * PersonaWare English 2.0.6 as Personaware-disk.vhd
   * Matching 2-head, 32-sector, 128-cylinder image metadata
   * A backup-first MiSTer installer
-  * ROM preparation tool, licenses, notices, and SHA-256 manifests
+  * ROM preparation and AO486-to-PC110 migration tools
+  * Licenses, notices, and SHA-256 manifests
 
 NOT INCLUDED
 
 IBM PC110 BIOS and font ROM files are not included. Supply dumps from hardware
 you own. The required prepared filenames are:
 
-  /media/fat/games/ao486/pc110_bios.bin
-  /media/fat/games/ao486/pc110_font.bin       optional Japanese font ROM
-  /media/fat/games/ao486/boot0.rom
-  /media/fat/games/ao486/boot1.rom
+  /media/fat/games/PC110/pc110_bios.bin
+  /media/fat/games/PC110/pc110_font.bin       optional Japanese font ROM
+  /media/fat/games/PC110/boot0.rom
+  /media/fat/games/PC110/boot1.rom
 
 Run tools/prepare-roms.sh on a macOS or Linux computer to validate your dumps
-and produce those files. Copy them into /media/fat/games/ao486 before or after
+and produce those files. Copy them into /media/fat/games/PC110 before or after
 running the installer. Running the installer again safely configures ROMs that
 were added later.
 
@@ -33,7 +34,7 @@ INSTALLATION
 2. Make sure MiSTer has network or local terminal access.
 3. From MiSTer Linux, run:
 
-     cd /path/to/IBM-PC110-MiSTer-Ready-20260806
+     cd /path/to/IBM-PC110-MiSTer-Ready-20260808
      sh install.sh
 
 The installer verifies every payload file, switches MiSTer to its menu, backs
@@ -43,10 +44,14 @@ and atomic renames.
 
 USING THE CORE
 
-Open IBM PC110 under Computers. The browser-visible name is IBM PC110, while
-the internal MiSTer service and Home directory remain AO486 so the core works
-with stock MiSTer Main. Mount Personaware-disk.vhd at IDE 0-0 if it is not
-selected automatically, then choose Reset and apply HDD.
+Open IBM PC110 under Computers. The internal service name and Home directory
+are PC110, while Main reuses its standard x86 implementation. This keeps PC110
+ROMs, disks, OSD state and UART settings separate from AO486. The installer
+preselects Personaware-disk.vhd at IDE 0-0 on a new installation.
+
+This core requires a MiSTer Main version containing Main_MiSTer#1272. The
+installer checks Main before changing any files and stops safely if the PC110
+x86 variant is unavailable.
 
 The included VHD already uses its native 2/32/128 CHS layout. Do not apply its
 metadata file to an unrelated disk image. Incorrect CHS values can hide or
@@ -55,7 +60,7 @@ damage partitions.
 VERIFIED COMPONENTS
 
 Core SHA-256:
-  468ef3fd5fc7d8dc0e4224eb8b99633075a782cb083ada025633a21b7b2cb332
+  19df353c0986874ddf2abbd7cd1163292712f04a4283a6e104d7a16080b37e9c
 
 PersonaWare English VHD SHA-256:
   bb080741f5aac4a6cf9a47672a496c64ab4e332cd7e8535ce9d658e5707867e0

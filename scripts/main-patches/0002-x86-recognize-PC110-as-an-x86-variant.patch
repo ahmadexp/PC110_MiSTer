@@ -1,0 +1,33 @@
+From 6aa1c1beac1a9566fc661e9b418a3b83b1b70672 Mon Sep 17 00:00:00 2001
+From: ahmadexp <ahmadexp@gmail.com>
+Date: Sat, 8 Aug 2026 16:32:00 -0700
+Subject: [PATCH] Recognize PC110 as an x86 variant
+
+---
+ user_io.cpp | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/user_io.cpp b/user_io.cpp
+index 8f22521..ac1b27b 100644
+--- a/user_io.cpp
++++ b/user_io.cpp
+@@ -226,7 +226,15 @@ char is_menu()
+ static int is_x86_type = 0;
+ char is_x86()
+ {
+-	if (!is_x86_type) is_x86_type = strcasecmp(orig_name, "AO486") ? 2 : 1;
++	if (!is_x86_type)
++	{
++		if (!strcasecmp(orig_name, "AO486") ||
++		    !strcasecmp(orig_name, "PC110")
++		   )
++			is_x86_type = 1;
++		else
++			is_x86_type = 2;
++	}
+ 	return (is_x86_type == 1);
+ }
+ 
+-- 
+2.50.1 (Apple Git-155)
+
