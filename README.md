@@ -11,6 +11,19 @@ desktop with the keyboard and Japanese text working. Still a work in progress
 though, not every chip on the planar is modelled cycle-for-cycle. See
 [docs/STATUS.md](docs/STATUS.md) for what's verified and what's left.
 
+## Submission status
+
+The required PC110 recognition change was merged into MiSTer Main on
+August 9, 2026: [MiSTer-devel/Main_MiSTer#1272](https://github.com/MiSTer-devel/Main_MiSTer/pull/1272).
+The coordinated independent-identity core change is also merged and has passed
+the complete regression on two MiSTer systems.
+
+The currently published stable MiSTer Main binary predates that merge and does
+not recognize the new `PC110` identity. If you are interested in using this
+core, please wait for the next official MiSTer Main release before installing
+the public `v2026.08.08` package. The PC110 core is not yet included in the
+official MiSTer update database.
+
 ## MiSTer-ready download
 
 The [latest GitHub release](https://github.com/ahmadexp/PC110_MiSTer/releases/latest)
