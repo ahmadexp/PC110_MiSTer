@@ -10,7 +10,7 @@ The app can import firmware and disk-image files that you select through the iOS
 
 ## Network Access and External Links
 
-The app does not make an automatic network request when it launches or while you browse its built-in content. If you choose a link to a video, source repository, license, privacy policy, or other external resource, iOS opens that destination. The destination's operator may process data under its own privacy policy.
+The app does not make an automatic network request when it launches or while you browse its built-in content. If you choose a link to a source repository, legal notice, privacy policy, or other external resource, iOS opens that destination. The destination's operator may process data under its own privacy policy.
 
 ## Data Retention and Deletion
 
