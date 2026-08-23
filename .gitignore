@@ -50,3 +50,5 @@ c5_pin_model_dump.txt
 *.cdf
 __pycache__/
 *.pyc
+# Private cartridge images and mechanically generated FPGA memory images.
+mister-de25/artifacts/private/

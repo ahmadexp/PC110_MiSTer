@@ -1,0 +1,8 @@
+# tier	name	repository	purpose
+0	Menu	https://github.com/MiSTer-devel/Menu_MiSTer.git	platform boot and OSD
+0	InputTest	https://github.com/MiSTer-devel/InputTest_MiSTer.git	USB and controller validation
+0	MemTest	https://github.com/MiSTer-devel/MemTest_MiSTer.git	native SDRAM validation
+1	NES	https://github.com/MiSTer-devel/NES_MiSTer.git	baseline console core
+1	SNES	https://github.com/MiSTer-devel/SNES_MiSTer.git	higher-complexity console core
+1	Minimig	https://github.com/MiSTer-devel/Minimig-AGA_MiSTer.git	computer core with DDRAM and storage
+1	TurboGrafx16	https://github.com/MiSTer-devel/TurboGrafx16_MiSTer.git	console core with CD and backup storage

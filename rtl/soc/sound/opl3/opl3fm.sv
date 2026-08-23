@@ -186,25 +186,79 @@ module opl3_mem
 		DATA_WIDTH1    = 8,
 		ADDRESS_WIDTH1 = 13,
 		ADDRESS_WIDTH2 = 12,
-		INIT_FILE      = "opl3prg.mem"
+		INIT_FILE      = "opl3prg.mem",
+		DE25_INIT_FILE = "opl3prg.mif"
 )
 (
 	input                        clk,
 	input                        we1,
 	input   [ADDRESS_WIDTH1-1:0] addr1,
 	input      [DATA_WIDTH1-1:0] data_in1,
-	output reg [DATA_WIDTH1-1:0] data_out1,
-
+	output logic [DATA_WIDTH1-1:0] data_out1,
 	input                        we2,
 	input   [ADDRESS_WIDTH2-1:0] addr2,
-	input      [DATA_WIDTH2-1:0] data_in2, 
-	output reg [DATA_WIDTH2-1:0] data_out2
+	input [DATA_WIDTH1*(1 << (ADDRESS_WIDTH1-ADDRESS_WIDTH2))-1:0] data_in2,
+	output logic [DATA_WIDTH1*(1 << (ADDRESS_WIDTH1-ADDRESS_WIDTH2))-1:0] data_out2
 );
-
 localparam RATIO = 1 << (ADDRESS_WIDTH1 - ADDRESS_WIDTH2);
 localparam DATA_WIDTH2 = DATA_WIDTH1 * RATIO;
 localparam RAM_DEPTH = 1 << ADDRESS_WIDTH2;
 
+`ifdef DE25_NANO
+// Quartus Pro for Agilex 5 does not infer this mixed-width, bidirectional
+// memory from the packed SystemVerilog array below.  When both OPL2 and OPL3
+// remain selectable it expands the 8 KiB memory into roughly 175k ALUTs.
+// Agilex 5 M20K true-dual-port mode requires equal port widths, so store
+// 4096 16-bit words and make the Z80's 8192-byte port a byte-enabled view.
+wire [DATA_WIDTH2-1:0] ram_q1;
+wire [DATA_WIDTH2-1:0] ram_q2;
+reg                    addr1_byte;
+
+always@(posedge clk) addr1_byte <= addr1[0];
+assign data_out1 = addr1_byte ? ram_q1[15:8] : ram_q1[7:0];
+assign data_out2 = ram_q2;
+
+altsyncram #(
+	.address_reg_b("CLOCK0"),
+	.clock_enable_input_a("BYPASS"),
+	.clock_enable_input_b("BYPASS"),
+	.clock_enable_output_a("BYPASS"),
+	.clock_enable_output_b("BYPASS"),
+	.indata_reg_b("CLOCK0"),
+	.init_file(DE25_INIT_FILE),
+	.intended_device_family("Agilex 5"),
+	.lpm_type("altsyncram"),
+	.numwords_a(RAM_DEPTH),
+	.numwords_b(RAM_DEPTH),
+	.operation_mode("BIDIR_DUAL_PORT"),
+	.outdata_aclr_a("NONE"),
+	.outdata_aclr_b("NONE"),
+	.outdata_reg_a("UNREGISTERED"),
+	.outdata_reg_b("UNREGISTERED"),
+	.power_up_uninitialized("FALSE"),
+	.read_during_write_mode_port_a("NEW_DATA_NO_NBE_READ"),
+	.read_during_write_mode_port_b("NEW_DATA_NO_NBE_READ"),
+	.widthad_a(ADDRESS_WIDTH2),
+	.widthad_b(ADDRESS_WIDTH2),
+	.width_a(DATA_WIDTH2),
+	.width_b(DATA_WIDTH2),
+	.width_byteena_a(RATIO),
+	.width_byteena_b(1),
+	.wrcontrol_wraddress_reg_b("CLOCK0")
+) ram_m20k (
+	.address_a(addr1[ADDRESS_WIDTH1-1:1]),
+	.address_b(addr2),
+	.byteena_a({addr1[0], ~addr1[0]}),
+	.byteena_b(1'b1),
+	.clock0(clk),
+	.data_a({RATIO{data_in1}}),
+	.data_b(data_in2),
+	.q_a(ram_q1),
+	.q_b(ram_q2),
+	.wren_a(we1),
+	.wren_b(we2)
+);
+`else
 reg [RATIO-1:0] [DATA_WIDTH1-1:0] ram[0:RAM_DEPTH-1];
 initial $readmemh(INIT_FILE, ram);
 
@@ -215,6 +269,7 @@ always@(posedge clk) data_out1 <= ram[addr1 / RATIO][addr1 % RATIO];
 // port B
 always@(posedge clk) if(we2) ram[addr2] = data_in2;
 always@(posedge clk) data_out2 <= ram[addr2];
+`endif
 
 endmodule
 

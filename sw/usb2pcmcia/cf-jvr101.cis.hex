@@ -1,0 +1,5 @@
+# Synthetic packed PCMCIA CIS for the Panasonic CF-JVR101 FM Radio Card.
+# Derived from Panasonic's original FM_RADIO.INF resource descriptor.
+# Main presents these bytes at even attribute-memory addresses.
+1517040150414e41534f4e49430043462d4a565231303100ff210202001a05
+01200002031b0de0419927554d5d066330ffff08ff

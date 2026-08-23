@@ -11,6 +11,7 @@ main_dir="$(cd "$1" && pwd)"
 patch_dir="${repo_dir}/scripts/main-patches"
 patches=(
   "${patch_dir}/0001-IDE-complete-common-no-data-ATA-commands.patch"
+  "${patch_dir}/0002-x86-add-PC110-physical-PCMCIA-service.patch"
 )
 
 git -C "${main_dir}" apply --check "${patches[@]}"

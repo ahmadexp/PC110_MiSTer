@@ -1,5 +1,7 @@
 
-module system
+module system #(
+	parameter PC110_POSTLOG_ENABLE = 1'b0
+)
 (
 	input         reset,
 
@@ -12,6 +14,7 @@ module system
 	output [1:0]  fdd_request,
 	output [2:0]  ide0_request,
 	output [2:0]  ide1_request,
+	output        pcmcia_request,
 	input  [1:0]  floppy_wp,
 
 	input  [13:0] joystick_dig_1,
@@ -138,12 +141,14 @@ wire        mgmt_ide0_cs;
 wire        mgmt_ide1_cs;
 wire        mgmt_fdd_cs;
 wire        mgmt_rtc_cs;
+wire [15:0] mgmt_pcmcia_readdata;
+wire        mgmt_pcmcia_cs;
 
 wire        interrupt_done;
 wire        interrupt_do;
 wire  [7:0] interrupt_vector;
 reg  [15:0] interrupt;
-wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_12, irq_14, irq_15;
+wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, sound_irq_10, irq_12, irq_14, irq_15;
 
 wire        cpu_io_read_do;
 wire [15:0] cpu_io_read_address;
@@ -192,6 +197,8 @@ wire [31:0] ide0_readdata;
 wire [31:0] ide1_readdata;
 wire  [7:0] joystick_readdata;
 wire  [7:0] pit_readdata;
+wire  [7:0] pc110_pit_readdata;
+reg   [7:0] pc110_pit1_readdata;
 wire  [7:0] ps2_readdata;
 wire  [7:0] rtc_readdata;
 wire  [7:0] uart1_readdata;
@@ -209,6 +216,19 @@ wire  [6:0] pc110_font_bank;
 wire  [7:0] pc110_font_segment;
 wire        pc110_font_enable;
 wire  [7:0] pc110_dram_cfg0;
+wire        pcmcia_io_cs;
+wire  [2:0] pcmcia_io_window;
+wire [15:0] pcmcia_io_card_address;
+wire [31:0] pcmcia_io_readdata;
+wire        pcmcia_io_wait;
+wire        pcmcia_mem_cs;
+wire  [2:0] pcmcia_mem_window;
+wire [25:0] pcmcia_mem_card_address;
+wire        pcmcia_mem_attribute;
+wire        pcmcia_backend_online;
+wire        pcmcia_card_present;
+wire        pcmcia_backend_irq;
+wire        pcmcia_irq_10;
 
 wire [29:0] mem_address;
 wire [31:0] mem_writedata;
@@ -219,6 +239,13 @@ wire        mem_write;
 wire        mem_read;
 wire        mem_waitrequest;
 wire        mem_readdatavalid;
+wire [31:0] cache_mem_readdata;
+wire        cache_mem_waitrequest;
+wire        cache_mem_readdatavalid;
+wire [31:0] pcmcia_mem_readdata;
+wire        pcmcia_mem_waitrequest;
+wire        pcmcia_mem_readdatavalid;
+wire        pcmcia_mem_active;
 
 wire [16:0] vga_address;
 wire  [7:0] vga_readdata;
@@ -243,6 +270,10 @@ wire       rtc_setup_ack;
 // setup request; earlier incidental CMOS 7Bh reads must not.
 assign bios_setup_ack = rtc_setup_ack & pc110_ckpt_boot;
 
+assign mem_readdata = pcmcia_mem_active ? pcmcia_mem_readdata : cache_mem_readdata;
+assign mem_waitrequest = pcmcia_mem_active ? pcmcia_mem_waitrequest : cache_mem_waitrequest;
+assign mem_readdatavalid = pcmcia_mem_active ? pcmcia_mem_readdatavalid : cache_mem_readdatavalid;
+
 l2_cache cache
 (
 	.CLK               (clk_sys),
@@ -258,13 +289,13 @@ l2_cache cache
 
 	.CPU_ADDR          (mem_address),
 	.CPU_DIN           (mem_writedata),
-	.CPU_DOUT          (mem_readdata),
-	.CPU_DOUT_READY    (mem_readdatavalid),
+	.CPU_DOUT          (cache_mem_readdata),
+	.CPU_DOUT_READY    (cache_mem_readdatavalid),
 	.CPU_BE            (mem_byteenable),
 	.CPU_BURSTCNT      (mem_burstcount),
-	.CPU_BUSY          (mem_waitrequest),
-	.CPU_RD            (mem_read),
-	.CPU_WE            (mem_write),
+	.CPU_BUSY          (cache_mem_waitrequest),
+	.CPU_RD            (mem_read & ~pcmcia_mem_cs),
+	.CPU_WE            (mem_write & ~pcmcia_mem_cs),
 
 	.DDRAM_ADDR        (DDRAM_ADDR),
 	.DDRAM_DIN         (DDRAM_DIN),
@@ -313,8 +344,8 @@ end
 wire kbc_cpu_reset = (kbc_cpu_rst_cnt != 8'd0);
 
 // easysetup_remap is asserted while the BIOS exposes its unpacked setup
-// image, but it drops again before the VGA frame is displayed. Keep the
-// PC110 LCD palette selected for the rest of that setup session. A machine
+// image, but it drops again before the VGA frame is displayed.  Keep the
+// PC110 LCD palette selected for the rest of that setup session.  A machine
 // or keyboard-controller reset clears it before the next normal boot.
 always @(posedge clk_sys) begin
 	if(reset || kbc_cpu_reset)
@@ -399,7 +430,7 @@ always @(posedge clk_sys) begin
 		ctlport <= 8'hA2;
 		in_reset <= 1;
 	end
-	else if((ide0_cs|ide1_cs|floppy0_cs) && in_reset) begin
+	else if(((~pcmcia_io_cs & (ide0_cs|ide1_cs))|floppy0_cs) && in_reset) begin
 		ctlport <= 0;
 		in_reset <= 0;
 	end
@@ -412,11 +443,12 @@ end
 assign syscfg = ctlport;
 
 wire [7:0] iobus_readdata8 =
+	( pcmcia_io_cs                          ) ? pcmcia_io_readdata[7:0] :
 	( pc110_cs                              ) ? pc110_readdata     :
 	( floppy0_cs                             ) ? floppy0_readdata  :
 	( dma_master_cs|dma_slave_cs|dma_page_cs ) ? dma_io_readdata   :
 	( pic_master_cs|pic_slave_cs             ) ? pic_readdata      :
-	( pit_cs                                 ) ? pit_readdata      :
+	( pit_cs                                 ) ? pc110_pit_readdata :
 	( ps2_io_cs|ps2_ctl_cs                   ) ? ps2_readdata      :
 	( rtc_cs                                 ) ? rtc_readdata      :
 	( sb_cs|fm_cs                            ) ? sound_readdata    :
@@ -427,7 +459,82 @@ wire [7:0] iobus_readdata8 =
 	( joy_cs                                 ) ? joystick_readdata :
 	                                             8'hFF;
 
-pc110_chipset pc110
+// PC110 firmware uses port 61h bit 4 as the DRAM-refresh timing reference
+// throughout POST and the C&T video BIOS. Keep that board signal independent
+// of PIT channel state: at the fixed 30 MHz PC110 clock, 452 cycles produces
+// the hardware's approximately 15.1 us half-period. All other 61h speaker and
+// status bits continue to come from the shared PIT implementation.
+reg [8:0] pc110_refresh_div = 9'd0;
+reg       pc110_refresh_toggle = 1'b0;
+always @(posedge clk_sys) begin
+	if(reset) begin
+		pc110_refresh_div <= 9'd0;
+		pc110_refresh_toggle <= 1'b0;
+	end
+	else if(pc110_refresh_div == 9'd451) begin
+		pc110_refresh_div <= 9'd0;
+		pc110_refresh_toggle <= ~pc110_refresh_toggle;
+	end
+	else begin
+		pc110_refresh_div <= pc110_refresh_div + 1'd1;
+	end
+end
+// The PC110 BIOS also performs a destructive readback test of PIT channel 1.
+// Channel 1 is refresh-only on this machine, so model its LSB counter directly
+// from the fixed 30 MHz core clock. This avoids relying on the generic PIT's
+// asynchronous refresh channel while preserving PIT channels 0 and 2.
+reg [4:0] pc110_pit1_div = 5'd0;
+reg [7:0] pc110_pit1_count = 8'd0;
+reg [7:0] pc110_pit1_latch = 8'd0;
+reg       pc110_pit1_latch_valid = 1'b0;
+always @(posedge clk_sys) begin
+	if(reset) begin
+		pc110_pit1_div <= 5'd0;
+		pc110_pit1_count <= 8'd0;
+		pc110_pit1_latch <= 8'd0;
+		pc110_pit1_latch_valid <= 1'b0;
+		pc110_pit1_readdata <= 8'd0;
+	end
+	else begin
+		if(pc110_pit1_div == 5'd24) begin
+			pc110_pit1_div <= 5'd0;
+			pc110_pit1_count <= pc110_pit1_count - 1'd1;
+		end
+		else begin
+			pc110_pit1_div <= pc110_pit1_div + 1'd1;
+		end
+
+		if(iobus_write && iobus_address == 16'h0041) begin
+			pc110_pit1_div <= 5'd0;
+			pc110_pit1_count <= iobus_writedata[7:0];
+			pc110_pit1_latch_valid <= 1'b0;
+		end
+		else if(iobus_write && iobus_address == 16'h0043 &&
+		        iobus_writedata[7:6] == 2'b01) begin
+			if(iobus_writedata[5:4] == 2'b00) begin
+				pc110_pit1_latch <= pc110_pit1_count;
+				pc110_pit1_latch_valid <= 1'b1;
+			end
+			else begin
+				pc110_pit1_latch_valid <= 1'b0;
+			end
+		end
+
+		if(iobus_read && iobus_address == 16'h0041) begin
+			pc110_pit1_readdata <= pc110_pit1_latch_valid ?
+				pc110_pit1_latch : pc110_pit1_count;
+			pc110_pit1_latch_valid <= 1'b0;
+		end
+	end
+end
+
+assign pc110_pit_readdata = (iobus_address == 16'h0061) ?
+	{pit_readdata[7:5], pc110_refresh_toggle, pit_readdata[3:0]} :
+	(iobus_address == 16'h0041) ? pc110_pit1_readdata : pit_readdata;
+
+pc110_chipset #(
+	.POSTLOG_ENABLE(PC110_POSTLOG_ENABLE)
+) pc110
 (
 	.clk                 (clk_sys),
 	.reset               (reset),
@@ -437,6 +544,17 @@ pc110_chipset pc110
 	.io_writedata        (iobus_writedata[7:0]),
 	.io_readdata         (pc110_readdata),
 	.io_cs               (pc110_cs),
+	.pcmcia_present      (pcmcia_card_present),
+	.pcmcia_backend_irq  (pcmcia_backend_irq),
+	.pcmcia_irq_10       (pcmcia_irq_10),
+	.pcmcia_io_cs        (pcmcia_io_cs),
+	.pcmcia_io_window    (pcmcia_io_window),
+	.pcmcia_io_card_address(pcmcia_io_card_address),
+	.pcmcia_mem_address  ({mem_address, 2'b00}),
+	.pcmcia_mem_cs       (pcmcia_mem_cs),
+	.pcmcia_mem_window   (pcmcia_mem_window),
+	.pcmcia_mem_card_address(pcmcia_mem_card_address),
+	.pcmcia_mem_attribute(pcmcia_mem_attribute),
 	.shadow_write_enable (pc110_shadow_write_enable),
 	.shadow_read_enable  (pc110_shadow_read_enable),
 	.romset              (pc110_romset),
@@ -445,7 +563,7 @@ pc110_chipset pc110
 	.font_window_enable  (pc110_font_enable),
 	.dram_cfg0           (pc110_dram_cfg0),
 	.postlog_tx          (pc110_postlog_tx),
-	.io_snoop            (ide0_cs ? ide0_readdata[7:0] : iobus_readdata8),
+	.io_snoop            ((~pcmcia_io_cs && ide0_cs) ? ide0_readdata[7:0] : iobus_readdata8),
 	.errlog_wr           (pc110_errlog_wr),
 	.errlog_tag          (pc110_errlog_tag),
 	.errlog_byte         (pc110_errlog_byte),
@@ -473,11 +591,52 @@ iobus iobus
 	.bus_address       (iobus_address),
 	.bus_write         (iobus_write),
 	.bus_read          (iobus_read),
-	.bus_io32          (((ide0_cs | ide1_cs) & ~iobus_address[9]) | sysctl_cs),
+	.bus_io32          ((pcmcia_io_cs && iobus_datasize > 1) |
+	                    (~pcmcia_io_cs & (ide0_cs | ide1_cs) & ~iobus_address[9]) |
+	                    sysctl_cs),
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
-	.bus_readdata      (ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : iobus_readdata8),
-	.bus_wait          (ide0_wait | ide1_wait)
+	.bus_readdata      (pcmcia_io_cs ? pcmcia_io_readdata :
+	                    ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : iobus_readdata8),
+	.bus_wait          (pcmcia_io_cs ? pcmcia_io_wait : (ide0_wait | ide1_wait))
+);
+
+pc110_pcmcia_bridge pcmcia_bridge
+(
+	.clk                (clk_sys),
+	.reset              (reset),
+	.io_cs              (pcmcia_io_cs),
+	.io_window          (pcmcia_io_window),
+	.io_card_address    (pcmcia_io_card_address),
+	.io_read            (iobus_read),
+	.io_write           (iobus_write),
+	.io_size            (iobus_datasize >= 4 ? 2'd2 :
+	                     iobus_datasize >= 2 ? 2'd1 : 2'd0),
+	.io_writedata       (iobus_writedata),
+	.io_readdata        (pcmcia_io_readdata),
+	.io_wait            (pcmcia_io_wait),
+	.mem_cs             (pcmcia_mem_cs),
+	.mem_window         (pcmcia_mem_window),
+	.mem_card_address   (pcmcia_mem_card_address),
+	.mem_attribute      (pcmcia_mem_attribute),
+	.mem_read           (mem_read),
+	.mem_write          (mem_write),
+	.mem_writedata      (mem_writedata),
+	.mem_byteenable     (mem_byteenable),
+	.mem_burstcount     (mem_burstcount),
+	.mem_readdata       (pcmcia_mem_readdata),
+	.mem_waitrequest    (pcmcia_mem_waitrequest),
+	.mem_readdatavalid  (pcmcia_mem_readdatavalid),
+	.mem_active         (pcmcia_mem_active),
+	.mgmt_address       (mgmt_address[7:0]),
+	.mgmt_read          (mgmt_read & mgmt_pcmcia_cs),
+	.mgmt_write         (mgmt_write & mgmt_pcmcia_cs),
+	.mgmt_writedata     (mgmt_writedata),
+	.mgmt_readdata      (mgmt_pcmcia_readdata),
+	.request            (pcmcia_request),
+	.backend_online     (pcmcia_backend_online),
+	.card_present       (pcmcia_card_present),
+	.card_irq           (pcmcia_backend_irq)
 );
 
 dma dma
@@ -559,8 +718,8 @@ wire [3:0] ide_address = {iobus_address[9],iobus_address[2:0]};
 wire ide0_nodata;
 reg  ide0_wait = 0;
 always @(posedge clk_sys) begin
-	if(iobus_read & ide0_cs & ide0_nodata & !ide_address) ide0_wait <= 1;
-	if(~ide0_nodata) ide0_wait <= 0;
+	if(iobus_read & ide0_cs & ~pcmcia_io_cs & ide0_nodata & !ide_address) ide0_wait <= 1;
+	if(pcmcia_io_cs | ~ide0_nodata) ide0_wait <= 0;
 end
 
 ide ide0
@@ -570,8 +729,8 @@ ide ide0
 
 	.io_address        (ide_address),
 	.io_writedata      (iobus_writedata),
-	.io_read           ((iobus_read & ide0_cs) | ide0_wait),
-	.io_write          (iobus_write & ide0_cs),
+	.io_read           ((iobus_read & ide0_cs & ~pcmcia_io_cs) | ide0_wait),
+	.io_write          (iobus_write & ide0_cs & ~pcmcia_io_cs),
 	.io_readdata       (ide0_readdata),
 	.io_32             (iobus_datasize[2]),
 
@@ -591,8 +750,8 @@ ide ide0
 wire ide1_nodata;
 reg  ide1_wait = 0;
 always @(posedge clk_sys) begin
-	if(iobus_read & ide1_cs & ide1_nodata & !ide_address) ide1_wait <= 1;
-	if(~ide1_nodata) ide1_wait <= 0;
+	if(iobus_read & ide1_cs & ~pcmcia_io_cs & ide1_nodata & !ide_address) ide1_wait <= 1;
+	if(pcmcia_io_cs | ~ide1_nodata) ide1_wait <= 0;
 end
 
 ide ide1
@@ -602,8 +761,8 @@ ide ide1
 
 	.io_address        (ide_address),
 	.io_writedata      (iobus_writedata),
-	.io_read           ((iobus_read & ide1_cs) | ide1_wait),
-	.io_write          (iobus_write & ide1_cs),
+	.io_read           ((iobus_read & ide1_cs & ~pcmcia_io_cs) | ide1_wait),
+	.io_write          (iobus_write & ide1_cs & ~pcmcia_io_cs),
 	.io_readdata       (ide1_readdata),
 	.io_32             (iobus_datasize[2]),
 
@@ -742,7 +901,7 @@ sound sound
 
 	.irq_5             (irq_5),
 	.irq_7             (irq_7),
-	.irq_10            (irq_10)
+	.irq_10            (sound_irq_10)
 );
 
 uart uart1
@@ -859,6 +1018,7 @@ vga vga
 	.vga_stride        (video_stride),
 	.vga_off           (video_off),
 	.vga_lores         (video_lores),
+	.vga_border        (1'b0),
 	.pc110_easysetup_palette(pc110_easysetup_palette_active),
 
 	.irq               (irq_2)
@@ -895,7 +1055,7 @@ always @* begin
 	interrupt[7]  = irq_7;
 	interrupt[8]  = irq_8;
 	interrupt[9]  = irq_9 | irq_2;
-	interrupt[10] = irq_10;
+	interrupt[10] = sound_irq_10 | pcmcia_irq_10;
 	interrupt[12] = irq_12;
 	interrupt[14] = irq_14;
 	interrupt[15] = irq_15;
@@ -905,6 +1065,10 @@ assign mgmt_ide0_cs  = (mgmt_address[15:8] == 8'hF0);
 assign mgmt_ide1_cs  = (mgmt_address[15:8] == 8'hF1);
 assign mgmt_fdd_cs   = (mgmt_address[15:8] == 8'hF2);
 assign mgmt_rtc_cs   = (mgmt_address[15:8] == 8'hF4);
-assign mgmt_readdata = mgmt_ide0_cs ? mgmt_ide0_readdata : mgmt_ide1_cs ? mgmt_ide1_readdata : mgmt_fdd_readdata;
+assign mgmt_pcmcia_cs = (mgmt_address[15:8] == 8'hF5);
+assign mgmt_readdata = mgmt_ide0_cs ? mgmt_ide0_readdata :
+	                      mgmt_ide1_cs ? mgmt_ide1_readdata :
+	                      mgmt_fdd_cs ? mgmt_fdd_readdata :
+	                      mgmt_pcmcia_cs ? mgmt_pcmcia_readdata : 16'hFFFF;
 
 endmodule

@@ -81,9 +81,17 @@ module gamma_fast
 	output reg [23:0] RGB_out
 );
 
+`ifdef DE25_PC110_CORE
+// The PC110 plus scaler is M20K constrained on Agilex 5.  Each channel is
+// only 2 Kibit, so use MLABs in this build and retain the screenshot scaler.
+(* ramstyle="MLAB, no_rw_check" *) reg [7:0] gamma_curve_r[256];
+(* ramstyle="MLAB, no_rw_check" *) reg [7:0] gamma_curve_g[256];
+(* ramstyle="MLAB, no_rw_check" *) reg [7:0] gamma_curve_b[256];
+`else
 (* ramstyle="no_rw_check" *) reg [7:0] gamma_curve_r[256];
 (* ramstyle="no_rw_check" *) reg [7:0] gamma_curve_g[256];
 (* ramstyle="no_rw_check" *) reg [7:0] gamma_curve_b[256];
+`endif
 
 assign     gamma_bus[21] = 1;
 wire       clk_sys = gamma_bus[20];

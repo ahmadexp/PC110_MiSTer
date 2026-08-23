@@ -24,6 +24,21 @@ module pc110_chipset
 	output logic  [7:0] io_readdata,
 	output logic        io_cs,
 
+	// Decoded socket-A windows. The host-serviced bridge consumes card-
+	// relative addresses while the guest continues to program normal ExCA
+	// system windows.
+	input  logic        pcmcia_present,
+	input  logic        pcmcia_backend_irq,
+	output logic        pcmcia_irq_10,
+	output logic        pcmcia_io_cs,
+	output logic  [2:0] pcmcia_io_window,
+	output logic [15:0] pcmcia_io_card_address,
+	input  logic [31:0] pcmcia_mem_address,
+	output logic        pcmcia_mem_cs,
+	output logic  [2:0] pcmcia_mem_window,
+	output logic [25:0] pcmcia_mem_card_address,
+	output logic        pcmcia_mem_attribute,
+
 	// One bit per 16 KiB block, C0000 first and FFFFF last.  In each
 	// VL82C420 AXS two-bit field, bit 0 controls writes to shadow RAM and
 	// bit 1 selects shadow RAM for reads.
@@ -82,13 +97,16 @@ module pc110_chipset
 	// clk_sys is 30 MHz; 30e6 / 115200 = 260.42
 	localparam int unsigned POSTLOG_DIV = 260;
 
-	logic [7:0] scamp [0:127];
-	logic [7:0] block2[0:255];
+	// These register files are far smaller than an Agilex 5 M20K.  Keeping
+	// them in MLABs avoids consuming five whole block-RAM instances in the
+	// DE25 PC110 build while preserving their inferred dual-port behavior.
+	(* ramstyle = "MLAB" *) logic [7:0] scamp [0:127];
+	(* ramstyle = "MLAB" *) logic [7:0] block2[0:255];
 	logic [7:0] eced [0:63];
 	logic [7:0] pcic [0:255];
-	logic [7:0] ecb [0:31];
-	logic [7:0] pos [0:7];
-	logic [7:0] xr [0:127];
+	(* ramstyle = "MLAB" *) logic [7:0] ecb [0:31];
+	(* ramstyle = "MLAB" *) logic [7:0] pos [0:7];
+	(* ramstyle = "MLAB" *) logic [7:0] xr [0:127];
 	logic [6:0] xr_index;
 
 	logic [6:0] scamp_index;
@@ -112,6 +130,7 @@ module pc110_chipset
 	logic       block2_gate;
 	logic       eced_gate;
 	logic [2:0] block2_unlock_step;
+	logic       pcmcia_present_d;
 
 	assign font_bank_select = font_bank[6:0];
 	assign font_window_segment = font_segment;
@@ -119,6 +138,69 @@ module pc110_chipset
 	assign dram_cfg0 = eced[8'h02];
 	assign easysetup_remap = (eced[8'h11] == 8'h00) && (eced[8'h12] == 8'h00) &&
 	                         planar_control[2];
+	assign pcmcia_irq_10 = pcmcia_present && pcmcia_backend_irq &&
+	                        (pcic[8'h03][3:0] == 4'hA);
+
+	// Socket A I/O-window decode. ExCA map-enable bits 6 and 7 correspond
+	// to I/O windows 0 and 1. The address handed to Main is relative to the
+	// card resource, so a host-side base assigned by the ARS enumerator can
+	// differ from the port chosen by the PC110 guest.
+	always_comb begin
+		pcmcia_io_cs = 1'b0;
+		pcmcia_io_window = 3'd0;
+		pcmcia_io_card_address = 16'h0000;
+		if(pcic[8'h06][6] &&
+		   io_address >= {pcic[8'h09], pcic[8'h08]} &&
+		   io_address <= {pcic[8'h0B], pcic[8'h0A]}) begin
+			pcmcia_io_cs = 1'b1;
+			pcmcia_io_window = 3'd0;
+			pcmcia_io_card_address = io_address - {pcic[8'h09], pcic[8'h08]};
+		end
+		else if(pcic[8'h06][7] &&
+		        io_address >= {pcic[8'h0D], pcic[8'h0C]} &&
+		        io_address <= {pcic[8'h0F], pcic[8'h0E]}) begin
+			pcmcia_io_cs = 1'b1;
+			pcmcia_io_window = 3'd1;
+			pcmcia_io_card_address = io_address - {pcic[8'h0D], pcic[8'h0C]};
+		end
+	end
+
+	// Five 4 KiB-granular ExCA memory windows. The 14-bit card-offset field
+	// is a signed page displacement; adding its shifted two's-complement
+	// representation yields the card byte address used by the host API.
+	integer pcmcia_mw;
+	logic [11:0] pcmcia_start_page;
+	logic [11:0] pcmcia_stop_page;
+	logic  [7:0] pcmcia_mem_reg;
+	always_comb begin
+		pcmcia_mem_cs = 1'b0;
+		pcmcia_mem_window = 3'd0;
+		pcmcia_mem_card_address = 26'd0;
+		pcmcia_mem_attribute = 1'b0;
+		pcmcia_start_page = 12'd0;
+		pcmcia_stop_page = 12'd0;
+		pcmcia_mem_reg = 8'h10;
+		for(pcmcia_mw = 0; pcmcia_mw < 5; pcmcia_mw = pcmcia_mw + 1) begin
+			pcmcia_mem_reg = 8'h10 + (pcmcia_mw * 8);
+			pcmcia_start_page = {
+				pcic[pcmcia_mem_reg + 1'b1][3:0], pcic[pcmcia_mem_reg]
+			};
+			pcmcia_stop_page = {
+				pcic[pcmcia_mem_reg + 3'd3][3:0], pcic[pcmcia_mem_reg + 2'd2]
+			};
+			if(!pcmcia_mem_cs && (pcmcia_mem_address[31:24] == 8'h00) &&
+			   pcic[8'h06][pcmcia_mw] &&
+			   pcmcia_mem_address[23:12] >= pcmcia_start_page &&
+			   pcmcia_mem_address[23:12] <= pcmcia_stop_page) begin
+				pcmcia_mem_cs = 1'b1;
+				pcmcia_mem_window = pcmcia_mw[2:0];
+				pcmcia_mem_card_address = {2'b00, pcmcia_mem_address[23:0]} +
+					{pcic[pcmcia_mem_reg + 3'd5][5:0],
+					 pcic[pcmcia_mem_reg + 3'd4], 12'h000};
+				pcmcia_mem_attribute = pcic[pcmcia_mem_reg + 3'd5][6];
+			end
+		end
+	end
 
 	integer i;
 	initial begin
@@ -341,8 +423,17 @@ module pc110_chipset
 			16'h03E0: io_readdata = 8'hFF;
 			16'h03E1: begin
 				// Software Card Detect (register 16h bit5) is a write-only
-				// event source and always reads as zero.
-				if(pcic_index[5:0] == 6'h16)
+				// event source and always reads as zero. Socket A's status
+				// follows the 82365 polarity: both CD bits mean inserted,
+				// POWERON follows a nonzero VCC selection, and I/O cards use
+				// bit 0 for the inactive STSCHG level rather than BVD1/BVD2.
+				if(pcic_index == 8'h01)
+					io_readdata = (pcic[pcic_index] & 8'hB0) |
+					                  (pcic[8'h03][5] ? 8'h01 : 8'h03) |
+					                  (pcmcia_present ? 8'h0C : 8'h00) |
+					                  ((pcmcia_present && |pcic[8'h02][4:3]) ?
+					                   8'h40 : 8'h00);
+				else if(pcic_index[5:0] == 6'h16)
 					io_readdata = pcic[pcic_index] & 8'hDF;
 				else
 					io_readdata = pcic[pcic_index];
@@ -402,8 +493,12 @@ module pc110_chipset
 			block2_gate       <= 1'b0;
 			eced_gate         <= 1'b0;
 			block2_unlock_step <= 3'd0;
+			pcmcia_present_d  <= 1'b0;
 		end
 		else begin
+			pcmcia_present_d <= pcmcia_present;
+			if(pcmcia_present != pcmcia_present_d)
+				pcic[8'h04] <= pcic[8'h04] | 8'h08;
 			lpt_status_read_d <= io_read && (io_address == 16'h03BD);
 			// Hold ACK through the complete bus read. Clearing it on the
 			// first clock with io_read high made the CPU sample only D0h.

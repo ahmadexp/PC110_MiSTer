@@ -26,7 +26,7 @@ Two important corrections follow from that rule:
 | VL82C420 gates | implemented | observed SCAMP, block-2, and EC/ED unlock sequences |
 | ROM shadow protection | implemented | write enable per 16 KiB upper-memory block |
 | CMOS | implemented | floppy/equipment/base/extended-memory fields plus checksum |
-| PCMCIA | register skeleton | two empty sockets, PCIC identity and writable ExCA registers; no cards or IRQ routing |
+| PCMCIA | physical bridge in bring-up | socket A ExCA I/O/common/attribute windows, 8/16/32-bit ATA I/O, memory bursts, guest wait states, host mailbox, card detect and IRQ10 are implemented; ARS USB2PCMCIA-R resource/card validation is in progress |
 | Internal modem | transport implemented | COM1 is connected to Main's modem transport at the PC110 diagnostic's 19,200 baud; PC110-specific identification responses remain incomplete |
 | font ROM | implemented | 1 MiB DDR image, banked 8 KiB window |
 | inking | minimal | idle/status behavior needed for enumeration only |
@@ -45,7 +45,9 @@ Two important corrections follow from that rule:
    VGA does not expose.
 4. EC-A, EC-B, battery, suspend/resume, and the jog/inking path need state
    machines based on firmware traces rather than static bytes.
-5. PCMCIA windows, card insertion, interrupts, and DMA are not connected.
+5. PCMCIA uses the ARS public application API and requires its user-supplied
+   enumerator/library. Packed-CIS attribute-memory fallback is implemented;
+   block-transfer optimization and first-card resource validation remain.
 6. ES488 mixer/DSP identification and exact IRQ/DMA behavior remain to be
    added on top of the inherited sound path.
 7. The fixed 30 MHz profile is the closest currently available setting; a

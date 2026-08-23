@@ -45,7 +45,12 @@ module simple_fifo
 );
 
 
+`ifdef DE25_PC110_CORE
+// The DE25 PC110 build has ample MLAB capacity but is M20K constrained.
+(* ramstyle = "MLAB" *) reg [width-1:0] mem [(2**widthu)-1:0];
+`else
 reg [width-1:0] mem [(2**widthu)-1:0];
+`endif
 
 reg [widthu-1:0] rd_index = 0;
 reg [widthu-1:0] wr_index = 0;

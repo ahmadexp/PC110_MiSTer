@@ -92,7 +92,8 @@ process (clk_WR,rst)
 begin 
 	if (rst = '1') then
 		add_WR <= (others => '0');
-		add_RD_WS <= (queue_depth => '1', (queue_depth-1) => '1', others => '0');
+		add_RD_WS <= (others => '0');
+		add_RD_WS(queue_depth downto queue_depth-1) <= (others => '1');
 		add_WR_GC <= (others => '0');
 	elsif (rising_edge(clk_WR)) then
 		add_RD_WS <= add_RD_GCwc;
@@ -102,7 +103,7 @@ begin
 			add_WR_GC <= (others => '0');
 		elsif (add_WR_CE = '1') then
 			add_WR <= n_add_WR;
-			add_WR_GC <= n_add_WR xor n_add_WR(queue_depth downto 1);
+				add_WR_GC <= n_add_WR xor ('0' & n_add_WR(queue_depth downto 1));
 		end if;
 	end if;
 end process;
@@ -133,17 +134,19 @@ begin
 		add_RD <= (others => '0');	
 		add_WR_RS <= (others => '0');
 		add_RD_GC <= (others => '0');
-		add_RD_GCwc <= (queue_depth => '1', (queue_depth-1) => '1', others => '0');
+		add_RD_GCwc <= (others => '0');
+		add_RD_GCwc(queue_depth downto queue_depth-1) <= (others => '1');
 	elsif (rising_edge(clk_RD)) then
 		add_WR_RS <= add_WR_GC;
 		if (srst_r = '1') then
 			add_RD <= (others => '0');
 			add_RD_GC <= (others => '0');
-			add_RD_GCwc <= (queue_depth => '1', (queue_depth-1) => '1', others => '0');
+			add_RD_GCwc <= (others => '0');
+			add_RD_GCwc(queue_depth downto queue_depth-1) <= (others => '1');
 		elsif (add_RD_CE = '1') then
 			add_RD <= n_add_RD;
-			add_RD_GC   <= n_add_RD xor n_add_RD(queue_depth downto 1);
-			add_RD_GCwc <= ((not n_add_RD(queue_depth downto queue_depth-1)) & n_add_RD(queue_depth-2 downto 0)) xor n_add_RD(queue_depth downto 1);
+				add_RD_GC   <= n_add_RD xor ('0' & n_add_RD(queue_depth downto 1));
+				add_RD_GCwc <= ((not n_add_RD(queue_depth downto queue_depth-1)) & n_add_RD(queue_depth-2 downto 0)) xor ('0' & n_add_RD(queue_depth downto 1));
 		end if;
 	end if;
 end process;

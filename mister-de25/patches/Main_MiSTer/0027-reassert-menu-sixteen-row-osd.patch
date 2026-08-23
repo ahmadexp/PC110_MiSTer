@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: DE25-Nano port
+Date: Wed, 19 Aug 2026 00:00:00 +0000
+Subject: [PATCH] Reassert Menu sixteen-row OSD
+
+Older OSD implementations clear their high-resolution latch on each disable
+transaction. Main can later enable a partially updated Menu screen without
+writing line 8, leaving only the upper eight rows visible. Select the Menu
+bitmap geometry immediately before every enable transaction.
+
+diff --git a/osd.cpp b/osd.cpp
+--- a/osd.cpp
++++ b/osd.cpp
+@@ -502,6 +502,10 @@ void OsdEnable(unsigned char mode)
+ {
+ 	user_io_osd_key_enable(mode & DISABLE_KEYBOARD);
+ 	mode &= (DISABLE_KEYBOARD | OSD_MSG);
++	// Explicitly reassert Menu's high-resolution (16-row) geometry before each
++	// enable. This also keeps Main compatible with older OSD implementations
++	// that clear the geometry latch on disable.
++	if (is_menu()) spi_osd_cmd(OSD_CMD_WRITE | 8);
+ 	spi_osd_cmd(OSD_CMD_ENABLE | mode);
+ }
+ 
+-- 
+2.43.0

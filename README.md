@@ -45,6 +45,11 @@ PersonaWare V1.0 after an unattended boot:
 
 ![PersonaWare](docs/images/ibm-pc110-personaware.png)
 
+The same PersonaWare desktop running on the DE25-Nano through the Agilex
+framebuffer scaler:
+
+![PersonaWare on DE25-Nano](docs/images/de25-pc110-personaware.png)
+
 ## ROMs
 
 No IBM firmware ships with this repo, you supply your own dump.
@@ -79,6 +84,35 @@ To build on a separate Quartus host over SSH:
 The bitstream ends up in `artifacts/PC110.rbf`. Set `DOCKER_BIN`,
 `DOCKER_CONTEXT` or `QUARTUS_IMAGE` if your setup needs it. There's a
 hardware-tested build under [releases/](releases) if you'd rather not compile.
+
+### DE25-Nano Agilex 5 port
+
+The complete MiSTer platform port is under [`mister-de25/`](mister-de25), with
+the original PC110-specific board bring-up retained under
+[`de25-nano/`](de25-nano). The port includes the Agilex HPS shell, ARM64 Main
+patches, Menu port, PC110 integration, onboard SDRAM and LPDDR4 adapters,
+runtime core switching, guarded FPGA loading, screenshot support, build
+scripts, and regression tests. It targets Quartus Prime Pro 25.3.1.
+
+The DE25-Nano already has 128 MB of 16-bit FPGA SDRAM onboard, so this port
+does not require an external MiSTer SDRAM module.
+
+Run the source-level test suites with:
+
+    scripts/test.sh
+    mister-de25/scripts/test.sh
+
+Build the Menu and PC110 images with:
+
+    mister-de25/scripts/build-menu.sh
+    mister-de25/scripts/build-pc110.sh
+
+The hardware-confirmed PC110 image is
+[`DE25_IBM_PC110_20260823_VERTICAL_ACCUM_FIX.rbf`](releases/DE25_IBM_PC110_20260823_VERTICAL_ACCUM_FIX.rbf).
+Its `.sha256` and `.hps-io-hash` sidecars are required by the guarded DE25
+runtime loader. The build fixes the 1024-profile scaler's vertical accumulator
+so the complete 480-line frame is read and displayed. IBM firmware and disk
+images are not included.
 
 ## Installing
 

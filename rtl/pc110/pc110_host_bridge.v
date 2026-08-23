@@ -34,7 +34,8 @@ module pc110_host_bridge
 
 	output reg        ext_midi,
 	input       [7:0] ext_req,
-	input       [1:0] ext_hotswap
+	input       [1:0] ext_hotswap,
+	input             ext_pcmcia_req
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -74,7 +75,9 @@ always@(posedge clk_sys) begin
 			if(byte_cnt == 0) begin
 				cmd <= io_din;
 				dout_en <= (io_din >= EXT_CMD_MIN && io_din <= EXT_CMD_MAX);
-				io_dout <= {4'hE, 2'b00, ext_hotswap, ext_req};
+				// Header bit 11 is PC110-specific and otherwise unused by the
+				// shared x86 protocol. Main services F500h when it is asserted.
+				io_dout <= {4'hE, ext_pcmcia_req, 1'b0, ext_hotswap, ext_req};
 			end
 			else begin
 				case(cmd)

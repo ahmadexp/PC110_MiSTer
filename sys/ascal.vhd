@@ -252,6 +252,11 @@ ENTITY ascal IS
 		avl_read           : OUT   std_logic;
 		avl_byteenable     : OUT   std_logic_vector(N_DW/8-1 DOWNTO 0);
 
+		-- Optional live instrumentation for platform bring-up. These ports do
+		-- not participate in scaler control or datapath behavior.
+		debug_state0       : OUT   unsigned(31 DOWNTO 0);
+		debug_state1       : OUT   unsigned(31 DOWNTO 0);
+
 		------------------------------------
 		reset_na           : IN    std_logic
 		);
@@ -1154,6 +1159,22 @@ ARCHITECTURE rtl OF ascal IS
 		RETURN v;
 	END FUNCTION;
 BEGIN
+	debug_state0(11 DOWNTO 0)<=to_unsigned(o_ivsize,12);
+	debug_state0(23 DOWNTO 12)<=to_unsigned(i_vrsize,12);
+	debug_state0(25 DOWNTO 24)<=to_unsigned(o_readlev,2);
+	debug_state0(27 DOWNTO 26)<=to_unsigned(o_copylev,2);
+	debug_state0(29 DOWNTO 28)<=to_unsigned(o_fload,2);
+	debug_state0(30)<=o_vpe;
+	debug_state0(31)<=to_std_logic(o_vcarrym);
+
+	debug_state1(11 DOWNTO 0)<=to_unsigned(o_vcpt_pre,12);
+	debug_state1(23 DOWNTO 12)<=o_vacpt;
+	debug_state1(25 DOWNTO 24)<=to_unsigned(enum_o_state'pos(o_state),2);
+	debug_state1(27 DOWNTO 26)<=to_unsigned(enum_o_copy'pos(o_copy),2);
+	debug_state1(28)<=o_readdataack;
+	debug_state1(29)<=o_readack;
+	debug_state1(30)<=o_adrsb;
+	debug_state1(31)<=o_adrsa;
 
 	-----------------------------------------------------------------------------
 	i_reset_na<='0'   WHEN reset_na='0' ELSE '1' WHEN rising_edge(i_clk);
@@ -2048,12 +2069,16 @@ BEGIN
 			o_adrsa<='0';
 			o_adrsb<=o_adrsa;
 
-			o_vacc_ini<=(o_vsize - o_ivsize + 8192) MOD 8192;
-			o_hacc_ini<=(o_hsize + o_ihsize + 8192) MOD 8192;
+			-- The output accumulators are sized from OHRESH. The original
+			-- constants below assumed OHRESH=2048; with the valid 1024 profile
+			-- they truncated every no-carry vertical result and left the state
+			-- machine permanently in sHSYNC after its two preload lines.
+			o_vacc_ini<=(o_vsize - o_ivsize + 4*OHRESH) MOD (4*OHRESH);
+			o_hacc_ini<=(o_hsize + o_ihsize + 4*OHRESH) MOD (4*OHRESH);
 
 			--Alternate phase
 			--o_vacc_ini<=o_ivsize;
-			--o_hacc_ini<=(2*o_hsize - o_ihsize + 8192) MOD 8192;
+			--o_hacc_ini<=(2*o_hsize - o_ihsize + 4*OHRESH) MOD (4*OHRESH);
 
 			CASE o_state IS
 					--------------------------------------------------
@@ -2067,16 +2092,16 @@ BEGIN
 
 					--------------------------------------------------
 				WHEN sHSYNC =>
-					dif_v :=(o_vacc_next - 2*o_vsize + 16384) MOD 16384;
+					dif_v :=(o_vacc_next - 2*o_vsize + 8*OHRESH) MOD (8*OHRESH);
 					IF o_prim THEN
-						IF dif_v>=8192 THEN
+						IF dif_v>=4*OHRESH THEN
 							o_vacc     <=o_vacc_next;
 						ELSE
 							o_vacc     <=dif_v;
 						END IF;
 					END IF;
-					IF dif_v>=8192 THEN
-						o_vacc_next<=(o_vacc_next + 2*o_ivsize) MOD 8192;
+					IF dif_v>=4*OHRESH THEN
+						o_vacc_next<=(o_vacc_next + 2*o_ivsize) MOD (4*OHRESH);
 						vcarry_v:=false;
 					ELSE
 						o_vacc_next<=dif_v;
@@ -2754,9 +2779,32 @@ BEGIN
 
 	-----------------------------------------------------------------------------
 	-- Output video sweep
-	OSWEEP:PROCESS(o_clk) IS
+	OSWEEP:PROCESS(o_clk,o_reset_na) IS
 	BEGIN
-		IF rising_edge(o_clk) THEN
+		IF o_reset_na='0' THEN
+			o_hcpt<=0;
+			o_vcpt<=0;
+			o_vcpt_pre<=0;
+			o_vcpt_pre2<=0;
+			o_vcpt_pre3<=0;
+			o_vcpt2<=0;
+			o_vcpt_sync<=0;
+			o_vcpt_sync2<=0;
+			o_hsv<=(OTHERS =>'0');
+			o_vsv<=(OTHERS =>'0');
+			o_dev<=(OTHERS =>'0');
+			o_pev<=(OTHERS =>'0');
+			o_end<=(OTHERS =>'0');
+			o_vss<='0';
+			o_sync<=false;
+			o_sync_max<=false;
+			o_vrr_min<=false;
+			o_vrr_min2<=false;
+			o_vrr_max<=false;
+			o_vrr_max2<=false;
+			o_vrr_sync<=false;
+			o_vrr_sync2<=false;
+		ELSIF rising_edge(o_clk) THEN
 
 			IF o_ce='1' THEN
 				-- Output pixels count

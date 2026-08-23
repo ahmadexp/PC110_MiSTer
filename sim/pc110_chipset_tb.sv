@@ -17,6 +17,17 @@ module pc110_chipset_tb;
 	logic postlog_tx;
 	logic kbd_hide;
 	logic ckpt_boot;
+	logic pcmcia_present = 0;
+	logic pcmcia_backend_irq = 0;
+	logic pcmcia_irq_10;
+	logic pcmcia_io_cs;
+	logic [2:0] pcmcia_io_window;
+	logic [15:0] pcmcia_io_card_address;
+	logic [31:0] pcmcia_mem_address = 0;
+	logic pcmcia_mem_cs;
+	logic [2:0] pcmcia_mem_window;
+	logic [25:0] pcmcia_mem_card_address;
+	logic pcmcia_mem_attribute;
 
 	always #5 clk = ~clk;
 
@@ -30,6 +41,17 @@ module pc110_chipset_tb;
 		.io_writedata(io_writedata),
 		.io_readdata(io_readdata),
 		.io_cs(io_cs),
+		.pcmcia_present(pcmcia_present),
+		.pcmcia_backend_irq(pcmcia_backend_irq),
+		.pcmcia_irq_10(pcmcia_irq_10),
+		.pcmcia_io_cs(pcmcia_io_cs),
+		.pcmcia_io_window(pcmcia_io_window),
+		.pcmcia_io_card_address(pcmcia_io_card_address),
+		.pcmcia_mem_address(pcmcia_mem_address),
+		.pcmcia_mem_cs(pcmcia_mem_cs),
+		.pcmcia_mem_window(pcmcia_mem_window),
+		.pcmcia_mem_card_address(pcmcia_mem_card_address),
+		.pcmcia_mem_attribute(pcmcia_mem_attribute),
 		.shadow_write_enable(shadow_we),
 		.shadow_read_enable(shadow_re),
 		.font_bank_select(font_bank),
@@ -100,7 +122,17 @@ module pc110_chipset_tb;
 		write_port(16'h03E0, 8'h00);
 		expect_read(16'h03E1, 8'h83, "PCIC socket A ID");
 		write_port(16'h03E0, 8'h01);
-		expect_read(16'h03E1, 8'h3F, "PCIC socket A interface status");
+		expect_read(16'h03E1, 8'h33, "PCIC socket A empty status");
+		pcmcia_present = 1'b1;
+		repeat(2) @(posedge clk);
+		expect_read(16'h03E1, 8'h3F, "PCIC socket A inserted status");
+		write_port(16'h03E0, 8'h02); write_port(16'h03E1, 8'hF1);
+		write_port(16'h03E0, 8'h03); write_port(16'h03E1, 8'h20);
+		write_port(16'h03E0, 8'h01);
+		expect_read(16'h03E1, 8'h7D, "PCIC powered I/O-card status");
+		write_port(16'h03E0, 8'h04);
+		expect_read(16'h03E1, 8'h08, "physical card-detect change latch");
+		expect_read(16'h03E1, 8'h00, "physical change latch clears on read");
 		write_port(16'h03E0, 8'h40);
 		expect_read(16'h03E1, 8'h83, "PCIC socket B ID");
 		write_port(16'h03E0, 8'h41);
@@ -116,6 +148,46 @@ module pc110_chipset_tb;
 		write_port(16'h03E0, 8'h44);
 		expect_read(16'h03E1, 8'h08, "PCIC card-detect change latch");
 		expect_read(16'h03E1, 8'h00, "PCIC change latch clears on read");
+
+		// ExCA socket-A I/O window 0 maps guest 300h-30Fh to card offsets
+		// 0-0Fh. The physical backend can use a different host base.
+		write_port(16'h03E0, 8'h08); write_port(16'h03E1, 8'h00);
+		write_port(16'h03E0, 8'h09); write_port(16'h03E1, 8'h03);
+		write_port(16'h03E0, 8'h0A); write_port(16'h03E1, 8'h0F);
+		write_port(16'h03E0, 8'h0B); write_port(16'h03E1, 8'h03);
+		write_port(16'h03E0, 8'h06); write_port(16'h03E1, 8'h40);
+		io_address = 16'h0305;
+		#1;
+		if(!pcmcia_io_cs || pcmcia_io_window !== 3'd0 ||
+		   pcmcia_io_card_address !== 16'h0005)
+			$fatal(1, "PCMCIA I/O window decode mismatch");
+		io_address = 16'h0310;
+		#1;
+		if(pcmcia_io_cs) $fatal(1, "PCMCIA I/O window stop decode mismatch");
+
+		// System-memory D0000h maps to card address zero as attribute memory.
+		write_port(16'h03E0, 8'h10); write_port(16'h03E1, 8'hD0);
+		write_port(16'h03E0, 8'h11); write_port(16'h03E1, 8'h00);
+		write_port(16'h03E0, 8'h12); write_port(16'h03E1, 8'hD0);
+		write_port(16'h03E0, 8'h13); write_port(16'h03E1, 8'h00);
+		write_port(16'h03E0, 8'h14); write_port(16'h03E1, 8'h30);
+		write_port(16'h03E0, 8'h15); write_port(16'h03E1, 8'h7F);
+		write_port(16'h03E0, 8'h06); write_port(16'h03E1, 8'h41);
+		pcmcia_mem_address = 32'h000D0012;
+		#1;
+		if(!pcmcia_mem_cs || pcmcia_mem_window !== 3'd0 ||
+		   pcmcia_mem_card_address !== 26'h0000012 || !pcmcia_mem_attribute)
+			$fatal(1, "PCMCIA memory window decode mismatch: cs=%b addr=%x attr=%b",
+				pcmcia_mem_cs, pcmcia_mem_card_address, pcmcia_mem_attribute);
+		pcmcia_mem_address = 32'h010D0012;
+		#1;
+		if(pcmcia_mem_cs) $fatal(1, "PCMCIA window aliased above 16 MiB");
+
+		write_port(16'h03E0, 8'h03); write_port(16'h03E1, 8'h0A);
+		pcmcia_backend_irq = 1'b1;
+		#1;
+		if(!pcmcia_irq_10) $fatal(1, "PCMCIA IRQ10 routing mismatch");
+		pcmcia_backend_irq = 1'b0;
 
 		// PC110 LPT1 uses the historical 03BCh base.
 		write_port(16'h03BC, 8'hA5);

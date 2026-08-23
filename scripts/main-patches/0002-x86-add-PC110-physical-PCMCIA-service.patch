@@ -1,0 +1,557 @@
+diff --git a/Makefile b/Makefile
+index 9634284..e723043 100644
+--- a/Makefile
++++ b/Makefile
+@@ -51,7 +51,7 @@ DEP	= $(C_SRC:%.c=$(BUILDDIR)/%.c.d) $(CPP_SRC:%.cpp=$(BUILDDIR)/%.cpp.d)
+ 
+ DFLAGS	= $(INCLUDE) -D_7ZIP_ST -DPACKAGE_VERSION=\"1.3.3\" -DHAVE_LROUND -DHAVE_STDINT_H -DHAVE_STDLIB_H -DHAVE_SYS_PARAM_H -DENABLE_64_BIT_WORDS=0 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -DVDATE=\"`date +"%y%m%d"`\"
+ CFLAGS	= $(DFLAGS) -Wall -Wextra -Wno-strict-aliasing -Wno-stringop-overflow -Wno-stringop-truncation -Wno-format-truncation -Wno-psabi -Wno-restrict -c
+-LFLAGS	= -lc -lstdc++ -lm -lrt $(IMLIB2_LIB) -Llib/bluetooth -lbluetooth -lpthread
++LFLAGS	= -lc -lstdc++ -lm -lrt -ldl $(IMLIB2_LIB) -Llib/bluetooth -lbluetooth -lpthread
+ 
+ OUTPUT_FILTER = sed -e 's/\(.[a-zA-Z]\+\):\([0-9]\+\):\([0-9]\+\):/\1(\2,\ \3):/g'
+ 
+diff --git a/support/x86/x86.cpp b/support/x86/x86.cpp
+index 85621ce..7c21c1f 100644
+--- a/support/x86/x86.cpp
++++ b/support/x86/x86.cpp
+@@ -39,6 +39,7 @@
+ #include "../../shmem.h"
+ #include "../../ide.h"
+ #include "x86_share.h"
++#include "pc110_pcmcia.h"
+ 
+ #define FDD0_BASE   0xF200
+ #define FDD1_BASE   0xF300
+@@ -551,6 +552,7 @@ void x86_init()
+ 	}
+ 
+ 	uint16_t cfg = ide_check();
++	pc110_pcmcia_init();
+ 	uint8_t hotswap[4] = {
+ 		0,
+ 		0,
+@@ -763,6 +765,7 @@ void x86_poll(int only_ide)
+ 	if(!only_ide) x86_share_poll();
+ 
+ 	uint16_t sd_req = ide_check();
++	pc110_pcmcia_poll(sd_req);
+ 	if (sd_req)
+ 	{
+ 		if (sd_req & 0x400) ide_cdda_send_sector();
+diff --git a/support/x86/pc110_pcmcia.cpp b/support/x86/pc110_pcmcia.cpp
+new file mode 100644
+index 0000000..c514dd2
+--- /dev/null
++++ b/support/x86/pc110_pcmcia.cpp
+@@ -0,0 +1,495 @@
++/*
++ * PC110 physical PCMCIA service.
++ *
++ * The FPGA exposes card-relative ExCA window transactions at management
++ * address F500h. This module dynamically loads the user-installed ARS
++ * Technologies public API and translates those requests to the resources
++ * assigned by the vendor enumerator. No vendor firmware or library is linked
++ * into or distributed with MiSTer Main.
++ */
++
++#include <dlfcn.h>
++#include <ctype.h>
++#include <errno.h>
++#include <limits.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../../fpga_io.h"
++#include "../../hardware.h"
++#include "../../spi.h"
++#include "../../user_io.h"
++#include "pc110_pcmcia.h"
++
++#define PCMCIA_BASE        0xF500
++#define PCMCIA_SIGNATURE   0x5043
++#define PCMCIA_DIR         "/media/fat/linux/pc110-pcmcia"
++#define PCMCIA_LIBRARY     PCMCIA_DIR "/libarsusb4.so"
++#define PCMCIA_CONFIG      PCMCIA_DIR "/pc110-pcmcia.cfg"
++#define PCMCIA_CIS         PCMCIA_DIR "/cis.hex"
++#define INVALID_RESOURCE  UINT32_MAX
++#define ATTRIBUTE_SIZE    0x10000
++
++typedef uint8_t  (*ars_in8_t)(uint16_t);
++typedef uint16_t (*ars_in16_t)(uint16_t);
++typedef void     (*ars_out8_t)(uint16_t, uint8_t);
++typedef void     (*ars_out16_t)(uint16_t, uint16_t);
++typedef uint8_t  (*ars_rd8_t)(uint32_t);
++typedef uint16_t (*ars_rd16_t)(uint32_t);
++typedef void     (*ars_wr8_t)(uint32_t, uint8_t);
++typedef void     (*ars_wr16_t)(uint32_t, uint16_t);
++typedef uint32_t (*ars_irq_t)();
++typedef int      (*ars_init_t)();
++typedef void     (*ars_exit_t)();
++
++struct ars_api
++{
++	void *handle;
++	ars_in8_t in8;
++	ars_in16_t in16;
++	ars_out8_t out8;
++	ars_out16_t out16;
++	ars_rd8_t rd8;
++	ars_rd16_t rd16;
++	ars_wr8_t wr8;
++	ars_wr16_t wr16;
++	ars_irq_t irq;
++	ars_init_t init;
++	ars_exit_t exit;
++};
++
++struct pcmcia_resources
++{
++	uint32_t io[2];
++	uint32_t common_mem;
++	uint32_t attribute_mem;
++	int present;
++};
++
++static ars_api api = {};
++static pcmcia_resources resources = {
++	{INVALID_RESOURCE, INVALID_RESOURCE},
++	INVALID_RESOURCE, INVALID_RESOURCE, 0
++};
++static int bridge_active;
++static int api_online;
++static int config_present_override = -1;
++static int card_irq;
++static int library_error_reported;
++static unsigned long api_retry_timer;
++static unsigned long config_timer;
++static unsigned long irq_timer;
++static uint8_t attribute_shadow[ATTRIBUTE_SIZE];
++static size_t attribute_cis_bytes;
++
++static void mailbox_read(uint16_t address, uint16_t *data, unsigned count)
++{
++	EnableIO();
++	fpga_spi_fast(UIO_DMA_READ);
++	fpga_spi_fast(address);
++	fpga_spi_fast(0);
++	fpga_spi_fast_block_read(data, count);
++	DisableIO();
++}
++
++static void mailbox_write(uint16_t address, uint16_t value)
++{
++	EnableIO();
++	fpga_spi_fast(UIO_DMA_WRITE);
++	fpga_spi_fast(address);
++	fpga_spi_fast(0);
++	fpga_spi_fast(value);
++	DisableIO();
++}
++
++static int resource_configured(uint32_t value)
++{
++	return value != INVALID_RESOURCE;
++}
++
++static int inferred_card_present()
++{
++	if(config_present_override >= 0) return config_present_override;
++	return resource_configured(resources.io[0]) ||
++	       resource_configured(resources.io[1]) ||
++	       resource_configured(resources.common_mem) ||
++	       resource_configured(resources.attribute_mem);
++}
++
++static uint16_t host_status(int acknowledge)
++{
++	return (card_irq ? 0x8000 : 0) |
++	       ((api_online && inferred_card_present()) ? 0x4000 : 0) |
++	       (api_online ? 0x2000 : 0) |
++	       (acknowledge ? 1 : 0);
++}
++
++static void send_host_status(int acknowledge)
++{
++	mailbox_write(PCMCIA_BASE, host_status(acknowledge));
++}
++
++static int parse_value(const char *text, uint32_t *value)
++{
++	char *end;
++	errno = 0;
++	unsigned long parsed = strtoul(text, &end, 0);
++	while(*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') end++;
++	if(errno || end == text || (*end && *end != '#') || parsed > UINT32_MAX)
++		return 0;
++	*value = (uint32_t)parsed;
++	return 1;
++}
++
++static int hex_nibble(int ch)
++{
++	if(ch >= '0' && ch <= '9') return ch - '0';
++	if(ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
++	if(ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
++	return -1;
++}
++
++static void load_cis()
++{
++	FILE *file = fopen(PCMCIA_CIS, "r");
++	attribute_cis_bytes = 0;
++	memset(attribute_shadow, 0xFF, sizeof(attribute_shadow));
++	if(!file) return;
++
++	int ch;
++	int high = -1;
++	int comment = 0;
++	while((ch = fgetc(file)) != EOF)
++	{
++		if(comment)
++		{
++			if(ch == '\n') comment = 0;
++			continue;
++		}
++		if(ch == '#')
++		{
++			comment = 1;
++			continue;
++		}
++		int nibble = hex_nibble(ch);
++		if(nibble < 0)
++		{
++			if(!isspace((unsigned char)ch)) high = -2;
++			continue;
++		}
++		if(high == -2) continue;
++		if(high < 0)
++		{
++			high = nibble;
++			continue;
++		}
++		if(attribute_cis_bytes >= ATTRIBUTE_SIZE / 2)
++		{
++			high = -2;
++			continue;
++		}
++		attribute_shadow[attribute_cis_bytes * 2] = (high << 4) | nibble;
++		attribute_cis_bytes++;
++		high = -1;
++	}
++	fclose(file);
++	if(high != -1)
++	{
++		printf("PC110 PCMCIA: ignoring malformed %s\n", PCMCIA_CIS);
++		attribute_cis_bytes = 0;
++		memset(attribute_shadow, 0xFF, sizeof(attribute_shadow));
++	}
++	else if(attribute_cis_bytes)
++	{
++		printf("PC110 PCMCIA: loaded %u packed CIS bytes from %s\n",
++		       (unsigned)attribute_cis_bytes, PCMCIA_CIS);
++	}
++}
++
++static void load_config()
++{
++	pcmcia_resources next = {
++		{INVALID_RESOURCE, INVALID_RESOURCE},
++		INVALID_RESOURCE, INVALID_RESOURCE, 0
++	};
++	int present_override = -1;
++	FILE *file = fopen(PCMCIA_CONFIG, "r");
++	if(file)
++	{
++		char line[256];
++		while(fgets(line, sizeof(line), file))
++		{
++			char key[64];
++			char value_text[128];
++			uint32_t value;
++			if(sscanf(line, " %63[^= ] = %127s", key, value_text) != 2 ||
++			   !parse_value(value_text, &value)) continue;
++
++			if(!strcmp(key, "io0")) next.io[0] = value;
++			else if(!strcmp(key, "io1")) next.io[1] = value;
++			else if(!strcmp(key, "common_mem")) next.common_mem = value;
++			else if(!strcmp(key, "attribute_mem")) next.attribute_mem = value;
++			else if(!strcmp(key, "present")) present_override = value ? 1 : 0;
++		}
++		fclose(file);
++	}
++
++	int changed = memcmp(&resources, &next, sizeof(resources)) ||
++	              config_present_override != present_override;
++	resources = next;
++	config_present_override = present_override;
++	if(!inferred_card_present()) card_irq = 0;
++	if(changed)
++	{
++		printf("PC110 PCMCIA: resources io=%s/%s common=%s attribute=%s present=%d\n",
++			resource_configured(resources.io[0]) ? "set" : "none",
++			resource_configured(resources.io[1]) ? "set" : "none",
++			resource_configured(resources.common_mem) ? "set" : "none",
++			resource_configured(resources.attribute_mem) ? "set" : "none",
++			inferred_card_present());
++	}
++}
++
++template<typename T>
++static int load_symbol(T *target, const char *name)
++{
++	*target = reinterpret_cast<T>(dlsym(api.handle, name));
++	return *target != NULL;
++}
++
++static int load_api()
++{
++	if(!api.handle)
++	{
++		api.handle = dlopen(PCMCIA_LIBRARY, RTLD_NOW | RTLD_LOCAL);
++		if(!api.handle)
++		{
++			if(!library_error_reported)
++			{
++				printf("PC110 PCMCIA: %s is unavailable: %s\n",
++				       PCMCIA_LIBRARY, dlerror());
++				library_error_reported = 1;
++			}
++			return 0;
++		}
++
++		if(!load_symbol(&api.in8, "in8") || !load_symbol(&api.in16, "in16") ||
++		   !load_symbol(&api.out8, "out8") || !load_symbol(&api.out16, "out16") ||
++		   !load_symbol(&api.rd8, "rd8") || !load_symbol(&api.rd16, "rd16") ||
++		   !load_symbol(&api.wr8, "wr8") || !load_symbol(&api.wr16, "wr16") ||
++		   !load_symbol(&api.irq, "GetIrqDma") ||
++		   !load_symbol(&api.init, "ArsInit") || !load_symbol(&api.exit, "ArsExit"))
++		{
++			printf("PC110 PCMCIA: vendor library is missing a documented API symbol\n");
++			dlclose(api.handle);
++			memset(&api, 0, sizeof(api));
++			return 0;
++		}
++	}
++
++	if(!api_online)
++	{
++		api_online = api.init() ? 1 : 0;
++		if(api_online)
++		{
++			library_error_reported = 0;
++			printf("PC110 PCMCIA: connected to ARS enumerator\n");
++		}
++	}
++	return api_online;
++}
++
++static int valid_io_address(uint32_t address)
++{
++	return address <= 0xFFFF;
++}
++
++static int valid_memory_address(uint32_t address, unsigned size)
++{
++	return address >= 0x000A0000 && address <= 0x000FFFFF &&
++	       size && address <= 0x00100000 - size;
++}
++
++static uint32_t service_io(uint16_t status, uint32_t offset, uint32_t data)
++{
++	unsigned window = (status >> 6) & 7;
++	unsigned size = (status >> 4) & 3;
++	uint32_t base = window < 2 ? resources.io[window] : INVALID_RESOURCE;
++	if(size > 2 || !resource_configured(base) || offset > UINT32_MAX - base ||
++	   !valid_io_address(base + offset) ||
++	   (size && base + offset == 0xFFFF))
++		return UINT32_MAX;
++
++	uint16_t port = (uint16_t)(base + offset);
++	if(status & 2)
++	{
++		if(size == 0)
++			api.out8(port, (uint8_t)data);
++		else
++		{
++			api.out16(port, (uint16_t)data);
++			// USB2PCMCIA-R presents a 16-bit PC Card bus, so a dword
++			// transfer is two consecutive words at the same I/O port.
++			if(size == 2) api.out16(port, (uint16_t)(data >> 16));
++		}
++	}
++	else
++	{
++		if(size == 0)
++			data = api.in8(port);
++		else
++		{
++			data = api.in16(port);
++			if(size == 2) data |= (uint32_t)api.in16(port) << 16;
++		}
++	}
++	return data;
++}
++
++static uint32_t service_attribute_shadow(uint16_t status, uint32_t offset,
++	                                     uint32_t data, uint8_t byteenable)
++{
++	if(offset > ATTRIBUTE_SIZE - 4) return UINT32_MAX;
++	if(status & 2)
++	{
++		// Tuple bytes remain read-only. Configuration registers follow the
++		// packed tuple stream and are shadowed so Card Services can select a
++		// configuration before using the already-enumerated physical I/O.
++		uint32_t tuple_limit = attribute_cis_bytes * 2;
++		for(unsigned i = 0; i < 4; i++)
++			if((byteenable & (1 << i)) && offset + i >= tuple_limit)
++				attribute_shadow[offset + i] = data >> (i * 8);
++	}
++	else
++	{
++		data = UINT32_MAX;
++		for(unsigned i = 0; i < 4; i++)
++			if(byteenable & (1 << i))
++				data = (data & ~(0xFFU << (i * 8))) |
++				       ((uint32_t)attribute_shadow[offset + i] << (i * 8));
++	}
++	return data;
++}
++
++static uint32_t service_memory(uint16_t status, uint32_t offset,
++	                           uint32_t data, uint8_t byteenable)
++{
++	if((status & 8) && !resource_configured(resources.attribute_mem) &&
++	   attribute_cis_bytes)
++		return service_attribute_shadow(status, offset, data, byteenable);
++
++	uint32_t base = (status & 8) ? resources.attribute_mem : resources.common_mem;
++	if(!resource_configured(base) || offset > UINT32_MAX - base)
++		return UINT32_MAX;
++	uint32_t address = base + offset;
++	if(!valid_memory_address(address, 4)) return UINT32_MAX;
++
++	if(status & 2)
++	{
++		if(byteenable == 0xF && !(address & 1))
++		{
++			api.wr16(address, (uint16_t)data);
++			api.wr16(address + 2, (uint16_t)(data >> 16));
++		}
++		else
++		{
++			for(unsigned i = 0; i < 4; i++)
++				if(byteenable & (1 << i)) api.wr8(address + i, data >> (i * 8));
++		}
++	}
++	else if(byteenable == 0xF && !(address & 1))
++	{
++		data = api.rd16(address) | ((uint32_t)api.rd16(address + 2) << 16);
++	}
++	else
++	{
++		data = UINT32_MAX;
++		for(unsigned i = 0; i < 4; i++)
++			if(byteenable & (1 << i))
++				data = (data & ~(0xFFU << (i * 8))) |
++				       ((uint32_t)api.rd8(address + i) << (i * 8));
++	}
++	return data;
++}
++
++static void service_request()
++{
++	uint16_t request[6];
++	mailbox_read(PCMCIA_BASE, request, 6);
++	uint16_t status = request[0];
++	if(!(status & 1)) return;
++
++	uint32_t address = request[1] | ((uint32_t)(request[2] & 0x03FF) << 16);
++	uint32_t data = request[3] | ((uint32_t)request[4] << 16);
++	uint8_t byteenable = request[5] & 0xF;
++
++	if(api_online && inferred_card_present())
++	{
++		if(status & 4)
++			data = service_memory(status, address, data, byteenable);
++		else
++			data = service_io(status, address, data);
++	}
++	else
++	{
++		data = UINT32_MAX;
++	}
++
++	mailbox_write(PCMCIA_BASE + 3, (uint16_t)data);
++	mailbox_write(PCMCIA_BASE + 4, (uint16_t)(data >> 16));
++	send_host_status(1);
++}
++
++void pc110_pcmcia_init()
++{
++	uint16_t signature;
++	bridge_active = 0;
++	mailbox_read(PCMCIA_BASE + 6, &signature, 1);
++	if(signature != PCMCIA_SIGNATURE) return;
++
++	bridge_active = 1;
++	load_config();
++	load_cis();
++	load_api();
++	api_retry_timer = GetTimer(2000);
++	config_timer = GetTimer(1000);
++	irq_timer = GetTimer(4);
++	send_host_status(0);
++}
++
++void pc110_pcmcia_poll(uint16_t request_status)
++{
++	if(!bridge_active) return;
++
++	if(CheckTimer(config_timer))
++	{
++		int was_present = inferred_card_present();
++		load_config();
++		config_timer = GetTimer(1000);
++		if(was_present != inferred_card_present()) send_host_status(0);
++	}
++
++	if(!api_online && CheckTimer(api_retry_timer))
++	{
++		load_api();
++		api_retry_timer = GetTimer(2000);
++		send_host_status(0);
++	}
++
++	if(api_online && inferred_card_present() &&
++	   (resource_configured(resources.io[0]) || resource_configured(resources.io[1]) || resource_configured(resources.common_mem) || resource_configured(resources.attribute_mem)) &&
++	   CheckTimer(irq_timer))
++	{
++		int next_irq = (api.irq() & (1U << 6)) ? 1 : 0;
++		irq_timer = GetTimer(4);
++		if(next_irq != card_irq)
++		{
++			card_irq = next_irq;
++			send_host_status(0);
++		}
++	}
++
++	if(request_status & 0x0800) service_request();
++}
+diff --git a/support/x86/pc110_pcmcia.h b/support/x86/pc110_pcmcia.h
+new file mode 100644
+index 0000000..75db55b
+--- /dev/null
++++ b/support/x86/pc110_pcmcia.h
+@@ -0,0 +1,9 @@
++#ifndef PC110_PCMCIA_H
++#define PC110_PCMCIA_H
++
++#include <stdint.h>
++
++void pc110_pcmcia_init();
++void pc110_pcmcia_poll(uint16_t request_status);
++
++#endif

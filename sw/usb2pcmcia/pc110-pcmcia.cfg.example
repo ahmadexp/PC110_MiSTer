@@ -1,0 +1,19 @@
+# Resource bases printed by the ARS enumerator. Keep present=0 until the
+# physical card has been enumerated and the values below have been filled in.
+present=0
+
+# I/O resources used by guest ExCA I/O windows 0 and 1.
+# io0=0x0000
+# io1=0x0000
+
+# CF-JVR101: for bus power, set the ARS power header to 2-3 (5 V) with USB
+# disconnected. For a regulated external 5 V supply, remove the power jumper.
+# Insert the card, turn on external power, and connect USB last.
+# Use the 8-byte I/O base printed by the Enumerator here as io0. The guest
+# Card Services stack can independently map that card-relative window to COM2
+# (02F8h); do not put 0x02F8 here unless the Enumerator actually assigned it.
+
+# Optional physical-memory resources in the vendor-supported A0000h-FFFFFh
+# host range. Most ATA PC Cards expose only I/O resources.
+# common_mem=0x000D0000
+# attribute_mem=0x000D0000

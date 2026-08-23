@@ -24,6 +24,16 @@ module emu
 	//Master input clock
 	input         CLK_50M,
 
+`ifdef DE25_NANO
+	// Fixed Agilex clock domains supplied by the DE25-Nano board wrapper.
+	input         DE25_CLK_SYS,
+	input         DE25_CLK_UART1,
+	input         DE25_CLK_MPU,
+	input         DE25_CLK_OPL,
+	input         DE25_CLK_VGA,
+	input         DE25_CLK_UART2,
+`endif
+
 	//Async reset from top-level module.
 	//Can be used as initial reset.
 	input         RESET,
@@ -109,7 +119,9 @@ module emu
 	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 
 	//ADC
+`ifndef DE25_OMIT_ADC_BUS
 	inout   [3:0] ADC_BUS,
+`endif
 
 	//SD-SPI
 	output        SD_SCK,
@@ -178,7 +190,9 @@ module emu
 
 //`define DEBUG
 
+`ifndef DE25_OMIT_ADC_BUS
 assign ADC_BUS  = 'Z;
+`endif
 assign {SDRAM_A, SDRAM_BA, SDRAM_DQ, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
@@ -326,7 +340,11 @@ wire [21:0] gamma_bus;
 wire  [7:0] uart1_mode;
 wire [31:0] uart1_speed;
 
-hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(0), .PS2DIV(2000), .PS2WE(1), .WIDE(1)) hps_io
+// The PC110 menu string is large enough that Quartus Pro 25.3 can optimize
+// the packed variable part-select to a constant zero on Agilex 5. Use the
+// supported synchronous ROM implementation so user-I/O returns the real
+// AO486 identity and options to Main.
+hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .PS2DIV(2000), .PS2WE(1), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -369,6 +387,7 @@ wire [15:0] mgmt_addr;
 wire        mgmt_rd;
 wire        mgmt_wr;
 wire  [7:0] mgmt_req;
+wire        pcmcia_req;
 
 wire [35:0] EXT_BUS;
 pc110_host_bridge host_bridge
@@ -383,7 +402,8 @@ pc110_host_bridge host_bridge
 	.ext_wr(mgmt_wr),
 
 	.ext_req(mgmt_req),
-	.ext_hotswap(status[39:38])
+	.ext_hotswap(status[39:38]),
+	.ext_pcmcia_req(pcmcia_req)
 );
 
 /////////////////////////////  PLL  //////////////////////////////////// 
@@ -391,7 +411,21 @@ pc110_host_bridge host_bridge
 wire clk_sys, clk_uart1, clk_uart2, clk_mpu, clk_opl, clk_vga;
 reg [27:0] cur_rate;
 
-`ifdef DEBUG
+`ifdef DE25_NANO
+
+assign clk_sys   = DE25_CLK_SYS;
+assign clk_uart1 = DE25_CLK_UART1;
+assign clk_mpu   = DE25_CLK_MPU;
+assign clk_opl   = DE25_CLK_OPL;
+assign clk_vga   = DE25_CLK_VGA;
+assign clk_uart2 = DE25_CLK_UART2;
+
+// The DE25 target uses the fixed, characterized 30 MHz ao486 profile. The VGA
+// engine runs at exactly four times the 25.173611 MHz HDMI scanout clock, so
+// no run-time PLL reconfiguration or asynchronous frame correction is needed.
+always @(posedge clk_sys) cur_rate <= 30000000;
+
+`elsif DEBUG
 
 pll2 pll
 (
@@ -727,6 +761,18 @@ assign VIDEO_ARY = fb_en ? fb_ary : ary;
 
 assign DDRAM_ADDR[28:25] = 4'h3;
 
+`ifdef DE25_PC110_CORE
+localparam [27:0] PC110_VGA_CLOCK_RATE = 28'd100694444;
+// The DE25 scanout clock is a fixed 25.173611 MHz output of the same PLL.
+// Do not let the legacy "60Hz" option retune the VGA pixel-enable accumulator
+// to 25.2 MHz once per frame.  That 1048 ppm mismatch makes the two-line CDC
+// buffer lap by one 800-pixel line every 30.3 ms and produces periodic tearing.
+wire PC110_VGA_FORCE_60 = 1'b0;
+`else
+localparam [27:0] PC110_VGA_CLOCK_RATE = 28'd90000000;
+wire PC110_VGA_FORCE_60 = ~status[4] | f60;
+`endif
+
 system system
 (
 	.clk_sys              (clk_sys),
@@ -745,7 +791,7 @@ system system
 	.l2_disable           (syscfg[7] ? syscfg[5] : status[16]),
 
 	.video_ce             (vga_ce),
-	.video_f60            (~status[4] | f60),
+	.video_f60            (PC110_VGA_FORCE_60),
 	.video_blank_n        (vga_de),
 	.video_hsync          (HSync),
 	.video_vsync          (VSync),
@@ -753,7 +799,7 @@ system system
 	.video_g              (g),
 	.video_b              (b),
 
-	.clock_rate_vga       (90000000),
+	.clock_rate_vga       (PC110_VGA_CLOCK_RATE),
 	.video_pal_a          (vga_pal_a),
 	.video_pal_d          (vga_pal_d),
 	.video_pal_we         (vga_pal_we),
@@ -803,6 +849,7 @@ system system
 	.ide0_request         (mgmt_req[2:0]),
 	.ide1_request         (mgmt_req[5:3]),
 	.fdd_request          (mgmt_req[7:6]),
+	.pcmcia_request       (pcmcia_req),
 	.floppy_wp            (status[2:1]),
 
 	.uart1_rx             (uart1_rx),
@@ -864,10 +911,10 @@ wire       bios_setup_ack;
 // then expires so later boots are normal).
 reg        inject_f1;      // retired: setup entry cannot work via scancode
 reg        bios_setup_req;
+reg [32:0] setup_cnt = 0;
 always @(posedge clk_sys) begin
 	reg        old_bios = 0, old_rst2 = 0;
 	reg [27:0] bios_rst_cnt = 0;
-	reg [32:0] setup_cnt    = 0;
 	reg [27:0] mrst_cnt     = 0;
 	reg [27:0] ram_rst_cnt  = 0;
 	reg  [1:0] old_ram_option = 0;
@@ -912,15 +959,18 @@ end
 
 reg menu_reset;
 
-reg reset;
+reg reset = 1'b1;
+reg [2:0] init_reset = 3'b111;
 always @(posedge clk_sys) begin
-	reg init_reset_n = 0;
-	reg old_rst = 0;
+	// Main normally pulses status[0] after loading a core, but the hardware
+	// reset input is the actual platform contract.  Release the private PC110
+	// reset automatically after three clean clk_sys edges so a freshly loaded
+	// core also starts before Main is running.  Re-arm the delay after every
+	// shell reset; status[0] and the menu reset sources remain fully active.
+	if(RESET) init_reset <= 3'b111;
+	else      init_reset <= {init_reset[1:0], 1'b0};
 
-	reset <= buttons[1] | status[0] | RESET | ~init_reset_n | menu_reset;
-
-	old_rst <= status[0];
-	if(old_rst & ~status[0]) init_reset_n <= 1;
+	reset <= buttons[1] | status[0] | RESET | init_reset[2] | menu_reset;
 end
 
 reg dbg_menu = 0;
@@ -1001,7 +1051,7 @@ always @(posedge CLK_VIDEO) begin
 		if(!to) mt32_lcd_on <= 0;
 		if(old_update ^ mt32_lcd_update) begin
 			mt32_lcd_on <= 1;
-			to <= 90000000 * 2;
+			to <= PC110_VGA_CLOCK_RATE * 2;
 		end
 	end
 end
@@ -1015,7 +1065,7 @@ reg  [16:0] spk_vol;
 always @(posedge CLK_AUDIO) spk_vol <= {2'b00, {3'b000,speaker_out} << status[19:18], 11'd0};
 
 wire [15:0] sb_out_l, sb_out_r;
-wire [16:0] sb_l, sb_r;
+reg  [16:0] sb_l, sb_r;
 always @(posedge CLK_AUDIO) begin
 	reg [15:0] old_l0, old_l1, old_r0, old_r1;
 	

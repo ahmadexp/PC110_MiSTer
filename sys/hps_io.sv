@@ -198,6 +198,17 @@ assign buttons = cfg[1:0];
 //cfg[2] - vga_scaler handled in sys_top
 //cfg[3] - csync handled in sys_top
 assign forced_scandoubler = cfg[4];
+
+// The command decoder references these signals before the conditional PS/2
+// device instances. Keep them in module scope for SystemVerilog elaboration.
+reg  [7:0] kbd_data;
+reg        kbd_we;
+wire [8:0] kbd_data_host;
+reg        kbd_rd;
+reg  [7:0] mouse_data;
+reg        mouse_we;
+wire [8:0] mouse_data_host;
+reg        mouse_rd;
 //cfg[5] - ypbpr handled in sys_top
 assign direct_video = cfg[10];
 
@@ -238,11 +249,16 @@ video_calc video_calc
 /////////////////////////////////////////////////////////
 
 localparam MAX_W = $clog2((64 > (STRLEN+2)) ? 64 : (STRLEN+2))-1;
+localparam CONF_AW = $clog2(STRLEN+1);
+
+reg [MAX_W:0] byte_cnt;
+wire [CONF_AW-1:0] conf_addr =
+	byte_cnt[CONF_AW-1:0] - {{(CONF_AW-1){1'b0}}, 1'b1};
 
 wire [7:0] conf_byte;
 generate
 	if(CONF_STR_BRAM) begin
-		confstr_rom #(CONF_STR, STRLEN) confstr_rom(.*, .conf_addr(byte_cnt - 1'd1));
+		confstr_rom #(CONF_STR, STRLEN) confstr_rom(.*, .conf_addr(conf_addr));
 	end
 	else begin
 		assign conf_byte = CONF_STR[{(STRLEN - byte_cnt),3'b000} +:8];
@@ -259,7 +275,6 @@ reg [31:0] ps2_key_raw = 0;
 wire       pressed  = (ps2_key_raw[15:8] != 8'hf0);
 wire       extended = (~pressed ? (ps2_key_raw[23:16] == 8'he0) : (ps2_key_raw[15:8] == 8'he0));
 
-reg [MAX_W:0] byte_cnt;
 reg   [3:0] sdn_ack;
 wire [15:0] disk = 16'd1 << io_din[11:8];
 
@@ -559,11 +574,6 @@ generate
 			end
 		end
 
-		reg  [7:0] kbd_data;
-		reg        kbd_we;
-		wire [8:0] kbd_data_host;
-		reg        kbd_rd;
-
 		ps2_device keyboard
 		(
 			.clk_sys(clk_sys),
@@ -581,11 +591,6 @@ generate
 			.rdata(kbd_data_host),
 			.rd(kbd_rd)
 		);
-
-		reg  [7:0] mouse_data;
-		reg        mouse_we;
-		wire [8:0] mouse_data_host;
-		reg        mouse_rd;
 
 		ps2_device mouse
 		(

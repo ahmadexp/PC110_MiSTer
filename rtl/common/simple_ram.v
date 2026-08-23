@@ -41,7 +41,13 @@ module simple_ram
     output   [width-1:0] q
 );
 
-   reg [width-1:0]   mem [(2**widthad)-1:0];
+`ifdef DE25_PC110_CORE
+   // The PC110 RTC is only 128x8.  Force it into distributed MLAB memory so
+   // the Agilex port does not spend a complete M20K on 1 Kibit of storage.
+   (* ramstyle = "MLAB" *) reg [width-1:0] mem [(2**widthad)-1:0];
+`else
+   reg [width-1:0] mem [(2**widthad)-1:0];
+`endif
    reg [widthad-1:0] rdaddr;
    
    always @(posedge clk) begin

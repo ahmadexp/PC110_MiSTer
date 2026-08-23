@@ -49,14 +49,19 @@ reg [27:0] clk_rate;
 always @(posedge clk) clk_rate <= clock_rate;
 
 reg ce_system_counter;
+reg [27:0] system_clock_sum;
 always @(posedge clk) begin
-	reg [27:0] sum = 0;
-
-	ce_system_counter = 0;
-	sum = sum + 28'd2386362; // 1193181hz * 2
-	if(sum >= clk_rate) begin
-		sum = sum - clk_rate;
-		ce_system_counter = 1;
+	if(rst_n == 1'b0) begin
+		system_clock_sum <= 28'd0;
+		ce_system_counter <= 1'b0;
+	end
+	else if(system_clock_sum + 28'd2386362 >= clk_rate) begin
+		system_clock_sum <= system_clock_sum + 28'd2386362 - clk_rate;
+		ce_system_counter <= 1'b1;
+	end
+	else begin
+		system_clock_sum <= system_clock_sum + 28'd2386362;
+		ce_system_counter <= 1'b0;
 	end
 end
 
