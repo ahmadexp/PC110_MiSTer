@@ -98,10 +98,37 @@ static int uniform_open_bus(const uint8_t *data, size_t len)
 	return 1;
 }
 
+static int dump_scan(const char *path, const uint8_t *data, size_t len)
+{
+	FILE *file;
+
+	if (!path || !*path)
+		return 0;
+	file = fopen(path, "wb");
+	if (!file) {
+		fprintf(stderr, "%s: %s\n", path, strerror(errno));
+		return -1;
+	}
+	if (fwrite(data, 1, len, file) != len) {
+		fprintf(stderr, "%s: %s\n", path, strerror(errno));
+		fclose(file);
+		return -1;
+	}
+	if (fclose(file)) {
+		fprintf(stderr, "%s: %s\n", path, strerror(errno));
+		return -1;
+	}
+	fprintf(stderr, "saved %zu-byte CIS parser input to %s\n", len, path);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	uint8_t scan[CIS_SCAN_SIZE];
 	struct user_regs regs;
+	const char *dump_path = getenv("PC110_CIS_DUMP");
+	const char *inject_env = getenv("PC110_CIS_INJECT");
+	int inject_open_bus = !inject_env || strcmp(inject_env, "0");
 	long original;
 	uint8_t open_bus_value;
 	pid_t child;
@@ -184,10 +211,17 @@ int main(int argc, char **argv)
 		perror("read Parse2 input");
 		return 1;
 	}
+	if (dump_scan(dump_path, scan, sizeof(scan)) == -1)
+		return 1;
 	if (!uniform_open_bus(scan, sizeof(scan))) {
 		fprintf(stderr,
 			"real CIS data detected (starts %02x %02x); not replacing it\n",
 			scan[0], scan[1]);
+	} else if (!inject_open_bus) {
+		fprintf(stderr,
+			"uniform %02x attribute scan left unchanged because "
+			"PC110_CIS_INJECT=0\n",
+			scan[0]);
 	} else {
 		open_bus_value = scan[0];
 		memset(scan, 0xff, sizeof(scan));

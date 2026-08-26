@@ -2,7 +2,15 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: make-update-bundle.sh [--runtime-only] OUTPUT_DIRECTORY" >&2
+    cat <<'EOF' >&2
+Usage: make-update-bundle.sh [--runtime-only] OUTPUT_DIRECTORY
+
+Environment:
+  MISTER_DE25_MAIN_BINARY        Main executable to package
+  MISTER_DE25_MENU_RBF           Menu runtime RBF to package
+  MISTER_DE25_BUILD_MATRIX       Core matrix to package
+  MISTER_DE25_PLATFORM_HASH_FILE Matching QSPI HPS I/O hash metadata
+EOF
 }
 
 runtime_only=0
@@ -18,7 +26,8 @@ fi
 platform_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 output=$1
 main_binary=${MISTER_DE25_MAIN_BINARY:-$platform_root/artifacts/main/MiSTer}
-menu_rbf=$platform_root/artifacts/menu/menu.rbf
+menu_rbf=${MISTER_DE25_MENU_RBF:-$platform_root/artifacts/menu/menu.rbf}
+build_matrix=${MISTER_DE25_BUILD_MATRIX:-$platform_root/build-matrix.tsv}
 rbfs=("$menu_rbf")
 core_categories=()
 core_rbfs=()
@@ -26,11 +35,12 @@ while IFS=$'\t' read -r category artifact; do
     core_categories+=("$category")
     core_rbfs+=("$platform_root/$artifact")
     rbfs+=("$platform_root/$artifact")
-done < <("$platform_root/scripts/list-packaged-artifacts.sh")
-platform_hash_file=$platform_root/artifacts/menu/qspi.hps-io-hash
+done < <("$platform_root/scripts/list-packaged-artifacts.sh" --managed "$build_matrix")
+platform_hash_file=${MISTER_DE25_PLATFORM_HASH_FILE:-$(dirname "$menu_rbf")/qspi.hps-io-hash}
 runtime_catalog=$(mktemp "${TMPDIR:-/tmp}/mister-de25-cores.XXXXXXXX.tsv")
 trap 'rm -f -- "$runtime_catalog"' EXIT
-"$platform_root/scripts/make-runtime-core-catalog.sh" "$runtime_catalog"
+"$platform_root/scripts/make-runtime-core-catalog.sh" --managed \
+    "$runtime_catalog" "$build_matrix"
 
 if [[ -e $output ]]; then
     echo "Refusing to overwrite existing path: $output" >&2
@@ -150,9 +160,9 @@ if [[ $runtime_only -eq 0 ]]; then
 
     add_payload "$menu_rbf" \
         fat menu.rbf 0644 menu.rbf
-    add_payload "$platform_root/artifacts/menu/menu.rbf.hps-io-hash" \
+    add_payload "$menu_rbf.hps-io-hash" \
         fat menu.rbf.hps-io-hash 0644 menu.rbf.hps-io-hash
-    add_payload "$platform_root/artifacts/menu/menu.rbf.sha256" \
+    add_payload "$menu_rbf.sha256" \
         fat menu.rbf.sha256 0644 menu.rbf.sha256
     for index in "${!core_rbfs[@]}"; do
         rbf=${core_rbfs[$index]}

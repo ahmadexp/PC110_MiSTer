@@ -66,7 +66,7 @@ def parse_profiles(path: Path) -> dict[str, dict[str, str]]:
     return profiles
 
 
-def profile_words(profile: dict[str, str]) -> tuple[int, int, int]:
+def profile_words(profile: dict[str, str]) -> tuple[int, int, int, int]:
     m = int(profile["m"])
     m_word = (
         (m << 20)
@@ -75,7 +75,12 @@ def profile_words(profile: dict[str, str]) -> tuple[int, int, int]:
         | (flag(profile["n_bypass"]) << 8)
         | byte_count(profile["n_hi"])
     )
-    return m_word, counter_word(profile, 0), charge_pump(m)
+    return (
+        m_word,
+        counter_word(profile, 0),
+        counter_word(profile, 1),
+        charge_pump(m),
+    )
 
 
 def validate(profile: dict[str, str], speed: int) -> None:
@@ -86,6 +91,12 @@ def validate(profile: dict[str, str], speed: int) -> None:
             f"{profile['profile']} C0 error is greater than 0.02%: "
             f"requested {expected}, got {actual}"
         )
+    physical = float(profile["actual1"])
+    if abs(physical - expected) / expected > 0.0002:
+        raise ValueError(
+            f"{profile['profile']} C1 error is greater than 0.02%: "
+            f"requested {expected}, got {physical}"
+        )
 
 
 def render(profiles: dict[str, dict[str, str]]) -> str:
@@ -94,10 +105,11 @@ def render(profiles: dict[str, dict[str, str]]) -> str:
         name = f"s{speed}"
         profile = profiles[name]
         validate(profile, speed)
-        m_word, c0_word, cp_word = profile_words(profile)
+        m_word, c0_word, c1_word, cp_word = profile_words(profile)
         cases.append(
             f"        3'd{speed}: profile = "
-            f"{{32'h{m_word:08X}, 32'h{c0_word:08X}, 15'h{cp_word:04X}}};"
+            f"{{32'h{m_word:08X}, 32'h{c0_word:08X}, "
+            f"32'h{c1_word:08X}, 15'h{cp_word:04X}}};"
         )
     cases_text = "\n".join(cases)
     return f'''// SPDX-License-Identifier: GPL-3.0-or-later
@@ -107,9 +119,10 @@ module de25_ao486_pll_profiles (
     input  logic [2:0] speed,
     output logic [31:0] m_settings,
     output logic [31:0] c0_settings,
+    output logic [31:0] c1_settings,
     output logic [14:0] charge_pump_settings
 );
-    logic [78:0] profile;
+    logic [110:0] profile;
     logic [2:0] bounded_speed;
 
     assign bounded_speed = speed > 3'd4 ? 3'd4 : speed;
@@ -120,7 +133,8 @@ module de25_ao486_pll_profiles (
         endcase
     end
 
-    assign {{m_settings, c0_settings, charge_pump_settings}} = profile;
+    assign {{m_settings, c0_settings, c1_settings,
+            charge_pump_settings}} = profile;
 endmodule
 '''
 

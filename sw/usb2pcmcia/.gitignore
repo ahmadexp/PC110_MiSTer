@@ -1,3 +1,8 @@
 /usb2pcmcia-probe
 /ars-readonly
+/arsenum4-cis-inject
+/arsenum4-usbfs-fwload
+/usb-hub-power-cycle
+/usb2pcmcia-direct
+/usb2pcmcia-usbfs-reset
 /firmware/build/

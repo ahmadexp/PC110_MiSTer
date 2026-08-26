@@ -177,6 +177,18 @@ builds `arsenum4-cis-inject`. If that executable is installed beside
 known CF-JVR101 tuple stream only when the vendor parser receives a uniform
 open-bus scan, and leaves real CIS data untouched.
 
+For a different card, disable that CF-specific fallback and capture exactly
+what the vendor parser received:
+
+```sh
+PC110_CIS_INJECT=0 PC110_CIS_DUMP=/tmp/card-cis.bin \
+  ./arsenum4-cis-inject ./arsenum4 d
+```
+
+The capture is written before any possible substitution. Keep `present=0`
+when the capture is a uniform open-bus value; do not construct a profile until
+both card-detect contacts close and the real tuple stream can be identified.
+
 The vendor Enumerator must first print a real I/O allocation for the card.
 Copy that host-side base to `io0` in `pc110-pcmcia.cfg` and only then set
 `present=1`; the PC110 guest may map the window to a different address such as

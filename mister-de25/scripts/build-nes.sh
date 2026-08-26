@@ -3,7 +3,8 @@ set -euo pipefail
 
 platform_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 workspace_root=$(cd "$platform_root/.." && pwd)
-project=DE25_MISTER_NES
+project=${DE25_NES_PROJECT:-DE25_MISTER_NES}
+output_directory=${DE25_NES_OUTPUT_DIRECTORY:-output_files_nes}
 output_rbf=${DE25_NES_OUTPUT_RBF:-$platform_root/artifacts/nes/NES_20260812.rbf}
 hps_bootloader=${DE25_HPS_BOOTLOADER:-$workspace_root/de25-nano/artifacts/u-boot-spl-dtb.hex}
 image=${QUARTUS_IMAGE:-alterafpga/quartus-pro:25.3.1-patch1.02-agilex5}
@@ -54,10 +55,10 @@ generate_and_build() {
     quartus_asm "$project" -c "$project"
     quartus_sta "$project" -c "$project"
     ../scripts/check-timing-summary.sh \
-        "output_files_nes/$project.sta.summary"
+        "$output_directory/$project.sta.summary"
     quartus_sta -t ../scripts/report-sdram-timing.tcl "$project"
     "$platform_root/scripts/make-hps-first-rbf.sh" \
-        "output_files_nes/$project.sof" "$output_rbf" "$hps_bootloader"
+        "$output_directory/$project.sof" "$output_rbf" "$hps_bootloader"
 }
 
 if command -v quartus_sh >/dev/null 2>&1; then
@@ -89,6 +90,8 @@ fi
 [[ -z ${DE25_HPS_RESET_RECOVERY:-} ]] || docker_args+=( -e "DE25_HPS_RESET_RECOVERY=$DE25_HPS_RESET_RECOVERY" )
 [[ -z ${DE25_HPS_RESET_V1_REPRO:-} ]] || docker_args+=( -e "DE25_HPS_RESET_V1_REPRO=$DE25_HPS_RESET_V1_REPRO" )
 [[ -z ${DE25_HPS_RESET_V1_RECOVERY:-} ]] || docker_args+=( -e "DE25_HPS_RESET_V1_RECOVERY=$DE25_HPS_RESET_V1_RECOVERY" )
+[[ -z ${DE25_NES_PROJECT:-} ]] || docker_args+=( -e "DE25_NES_PROJECT=$DE25_NES_PROJECT" )
+[[ -z ${DE25_NES_OUTPUT_DIRECTORY:-} ]] || docker_args+=( -e "DE25_NES_OUTPUT_DIRECTORY=$DE25_NES_OUTPUT_DIRECTORY" )
 if [[ -n ${DE25_EXPECTED_HPS_IO_HASH_FILE:-} ]]; then
     expected_hash_file=$("$platform_root/scripts/docker-workspace-path.sh" \
         "$workspace_root" "$DE25_EXPECTED_HPS_IO_HASH_FILE")

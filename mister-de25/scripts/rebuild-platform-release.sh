@@ -15,7 +15,7 @@ usage() {
 Usage: rebuild-platform-release.sh --hps-qdb FILE --hps-hash FILE
        [--skip-main] [--bundle DIRECTORY] [--image BASE.img OUTPUT.img]
 
-Rebuilds Menu and every registered DE25 core against one fitted HPS partition,
+Rebuilds Menu and every registered DE25 core against one reusable HPS partition,
 optionally rebuilds ARM64 Main, verifies every artifact, then optionally creates
 the update bundle and installable SD image.
 EOF

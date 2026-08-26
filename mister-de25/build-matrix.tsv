@@ -1,11 +1,11 @@
 category	name	home	sdram	repository	branch	source_id	status	build_script	artifact	timing	hardware	comments
 _Arcade	Act-Fancer: Cybernetick Hyper Weapon		yes	https://github.com/MiSTer-devel/Arcade-ActFancer_MISTer.git		MiSTer-devel_Arcade-ActFancer_MISTer	not-ported			not-run	not-run	
+_Arcade	Arabian		no	https://github.com/MiSTer-devel/Arcade-Arabian_MiSTer.git		MiSTer-devel_Arcade-Arabian_MiSTer	not-ported			not-run	not-run	
 _Arcade	Arkanoid		no	https://github.com/MiSTer-devel/Arcade-Arkanoid_MISTer.git		MiSTer-devel_Arcade-Arkanoid_MISTer	not-ported			not-run	not-run	
-_Arcade	Asteroids		yes	https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer.git		MiSTer-devel_Arcade-Asteroids_MiSTer	not-ported			not-run	not-run	
 _Arcade	Asteroids Deluxe		yes	https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer.git		MiSTer-devel_Arcade-Asteroids_MiSTer	not-ported			not-run	not-run	
-_Arcade	Lunar Lander		yes	https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer.git		MiSTer-devel_Arcade-Asteroids_MiSTer	not-ported			not-run	not-run	
 _Arcade	Bally&nbsp;Midway&nbsp;Astrocade&nbsp;/&nbsp;Bally&nbsp;Midway&nbsp;Arcade		no	https://github.com/MiSTer-devel/Arcade-Astrocade_MiSTer.git		MiSTer-devel_Arcade-Astrocade_MiSTer	not-ported			not-run	not-run	
 _Arcade	Atari System-1		yes	https://github.com/MiSTer-devel/Arcade-Atari-system1_MiSTer.git		MiSTer-devel_Arcade-Atari-system1_MiSTer	not-ported			not-run	not-run	
+_Arcade	Atari System-2		yes	https://github.com/MiSTer-devel/Arcade-AtariSystem2_MiSTer.git		MiSTer-devel_Arcade-AtariSystem2_MiSTer	not-ported			not-run	not-run	
 _Arcade	Atari Tetris		no	https://github.com/MiSTer-devel/Arcade-ATetris_MiSTer.git		MiSTer-devel_Arcade-ATetris_MiSTer	not-ported			not-run	not-run	
 _Arcade	Athena		no	https://github.com/MiSTer-devel/Arcade-Athena_MiSTer.git		MiSTer-devel_Arcade-Athena_MiSTer	not-ported			not-run	not-run	
 _Arcade	Bagman / Le Bagnard		no	https://github.com/MiSTer-devel/Arcade-Bagman_MiSTer.git		MiSTer-devel_Arcade-Bagman_MiSTer	not-ported			not-run	not-run	
@@ -29,6 +29,7 @@ _Arcade	Cave		yes	https://github.com/MiSTer-devel/Arcade-Cave_MiSTer.git		MiSTer
 _Arcade	Cave (Banpresto)		yes	https://github.com/MiSTer-devel/Arcade-CaveBanpresto_MiSTer.git		MiSTer-devel_Arcade-CaveBanpresto_MiSTer	not-ported			not-run	not-run	
 _Arcade	Centipede		no	https://github.com/MiSTer-devel/Arcade-Centipede_MiSTer.git		MiSTer-devel_Arcade-Centipede_MiSTer	not-ported			not-run	not-run	
 _Arcade	Chameleon		no	https://github.com/MiSTer-devel/Arcade-Chameleon_MiSTer.git		MiSTer-devel_Arcade-Chameleon_MiSTer	not-ported			not-run	not-run	
+_Arcade	Champion Base Ball		no	https://github.com/MiSTer-devel/Arcade-ChampionBaseball_MiSTer.git		MiSTer-devel_Arcade-ChampionBaseball_MiSTer	not-ported			not-run	not-run	
 _Arcade	China Gate		yes	https://github.com/MiSTer-devel/Arcade-ChinaGate_MiSTer.git		MiSTer-devel_Arcade-ChinaGate_MiSTer	not-ported			not-run	not-run	
 _Arcade	City Connection		no	https://github.com/MiSTer-devel/Arcade-CityConnection_MiSTer.git		MiSTer-devel_Arcade-CityConnection_MiSTer	not-ported			not-run	not-run	
 _Arcade	Computer Space		no	https://github.com/MiSTer-devel/Arcade-ComputerSpace_MiSTer.git		MiSTer-devel_Arcade-ComputerSpace_MiSTer	not-ported			not-run	not-run	
@@ -46,6 +47,7 @@ _Arcade	D-Con		yes	https://github.com/MiSTer-devel/Arcade-Dcon_MiSTer.git		MiSTe
 _Arcade	Deco16		yes	https://github.com/MiSTer-devel/Arcade-Deco16_Mister.git		MiSTer-devel_Arcade-Deco16_Mister	not-ported			not-run	not-run	
 _Arcade	Deco Cassette System		yes	https://github.com/MiSTer-devel/Arcade-DECOCassette_MiSTer.git		MiSTer-devel_Arcade-DECOCassette_MiSTer	not-ported			not-run	not-run	
 _Arcade	Defender		no	https://github.com/MiSTer-devel/Arcade-Defender_MiSTer.git		MiSTer-devel_Arcade-Defender_MiSTer	not-ported			not-run	not-run	
+_Arcade	Denjin Makai		yes	https://github.com/MiSTer-devel/Arcade-DenjinMakai_MiSTer.git		MiSTer-devel_Arcade-DenjinMakai_MiSTer	not-ported			not-run	not-run	
 _Arcade	Dig Dug		no	https://github.com/MiSTer-devel/Arcade-DigDug_MiSTer.git		MiSTer-devel_Arcade-DigDug_MiSTer	not-ported			not-run	not-run	
 _Arcade	Dominos		no	https://github.com/MiSTer-devel/Arcade-Dominos_MiSTer.git		MiSTer-devel_Arcade-Dominos_MiSTer	not-ported			not-run	not-run	
 _Arcade	Donkey Kong 3		no	https://github.com/MiSTer-devel/Arcade-DonkeyKong3_MiSTer.git		MiSTer-devel_Arcade-DonkeyKong3_MiSTer	not-ported			not-run	not-run	
@@ -85,8 +87,10 @@ _Arcade	Joust 2: Survival of the Fittest		no	https://github.com/MiSTer-devel/Arc
 _Arcade	Juno First		no	https://github.com/MiSTer-devel/Arcade-JunoFirst_MiSTer.git		MiSTer-devel_Arcade-JunoFirst_MiSTer	not-ported			not-run	not-run	
 _Arcade	Kangaroo		no	https://github.com/MiSTer-devel/Arcade-Kangaroo_MiSTer.git		MiSTer-devel_Arcade-Kangaroo_MiSTer	not-ported			not-run	not-run	
 _Arcade	Kick And Run		no	https://github.com/MiSTer-devel/Arcade-KickAndRun_MiSTer.git		MiSTer-devel_Arcade-KickAndRun_MiSTer	not-ported			not-run	not-run	
+_Arcade	Klax		no	https://github.com/MiSTer-devel/Arcade-Klax_MiSTer.git		MiSTer-devel_Arcade-Klax_MiSTer	not-ported			not-run	not-run	
 _Arcade	Kyugo System		no	https://github.com/MiSTer-devel/Arcade-Kyugo_MiSTer.git		MiSTer-devel_Arcade-Kyugo_MiSTer	not-ported			not-run	not-run	
 _Arcade	Lady Bug		no	https://github.com/MiSTer-devel/Arcade-LadyBug_MiSTer.git		MiSTer-devel_Arcade-LadyBug_MiSTer	not-ported			not-run	not-run	
+_Arcade	Laserdisc Games		yes	https://github.com/MiSTer-devel/Arcade-LaserdiscGames_MiSTer.git		MiSTer-devel_Arcade-LaserdiscGames_MiSTer	not-ported			not-run	not-run	
 _Arcade	Legionnaire		yes	https://github.com/MiSTer-devel/Arcade-Legionnaire_MiSTer.git		MiSTer-devel_Arcade-Legionnaire_MiSTer	not-ported			not-run	not-run	
 _Arcade	Major Havoc		yes	https://github.com/MiSTer-devel/Arcade-MajorHavoc_MiSTer.git		MiSTer-devel_Arcade-MajorHavoc_MiSTer	not-ported			not-run	not-run	
 _Arcade	Mario Bros		no	https://github.com/MiSTer-devel/Arcade-MarioBros_MiSTer.git		MiSTer-devel_Arcade-MarioBros_MiSTer	not-ported			not-run	not-run	
@@ -113,6 +117,7 @@ _Arcade	PolyPlay		no	https://github.com/MiSTer-devel/Arcade-PolyPlay_MiSTer.git	
 _Arcade	Pong		no	https://github.com/MiSTer-devel/Arcade-Pong_MiSTer.git		MiSTer-devel_Arcade-Pong_MiSTer	not-ported			not-run	not-run	
 _Arcade	Pooyan		no	https://github.com/MiSTer-devel/Arcade-Pooyan_MiSTer.git		MiSTer-devel_Arcade-Pooyan_MiSTer	not-ported			not-run	not-run	
 _Arcade	Popeye		no	https://github.com/MiSTer-devel/Arcade-Popeye_MiSTer.git		MiSTer-devel_Arcade-Popeye_MiSTer	not-ported			not-run	not-run	
+_Arcade	PsikyoSH2		yes	https://github.com/MiSTer-devel/Arcade-PsikyoSH2_MiSTer.git		MiSTer-devel_Arcade-PsikyoSH2_MiSTer	not-ported			not-run	not-run	
 _Arcade	Psychic 5		no	https://github.com/MiSTer-devel/Arcade-Psychic5_MiSTer.git		MiSTer-devel_Arcade-Psychic5_MiSTer	not-ported			not-run	not-run	
 _Arcade	QBert		no	https://github.com/MiSTer-devel/Arcade-QBert_MiSTer.git		MiSTer-devel_Arcade-QBert_MiSTer	not-ported			not-run	not-run	
 _Arcade	Qix		no	https://github.com/MiSTer-devel/Arcade-Qix_MiSTer.git		MiSTer-devel_Arcade-Qix_MiSTer	not-ported			not-run	not-run	
@@ -125,6 +130,7 @@ _Arcade	Salamander		no	https://github.com/MiSTer-devel/Arcade-Salamander_MiSTer.
 _Arcade	Scooter Shooter		no	https://github.com/MiSTer-devel/Arcade-ScooterShooter_MiSTer.git		MiSTer-devel_Arcade-ScooterShooter_MiSTer	not-ported			not-run	not-run	
 _Arcade	Scramble		yes	https://github.com/MiSTer-devel/Arcade-Scramble_MiSTer.git		MiSTer-devel_Arcade-Scramble_MiSTer	not-ported			not-run	not-run	
 _Arcade	SD Gundam Sangokushi Rainbow Tairiku Senki		yes	https://github.com/MiSTer-devel/Arcade-SDGundamRainbow_MiSTer.git		MiSTer-devel_Arcade-SDGundamRainbow_MiSTer	not-ported			not-run	not-run	
+_Arcade	Sega G80V		yes	https://github.com/MiSTer-devel/Arcade-SegaG80V_MiSTer.git		MiSTer-devel_Arcade-SegaG80V_MiSTer	not-ported			not-run	not-run	
 _Arcade	Sega System 1		no	https://github.com/MiSTer-devel/Arcade-SEGASYS1_MiSTer.git		MiSTer-devel_Arcade-SEGASYS1_MiSTer	not-ported			not-run	not-run	
 _Arcade	Sega/Gremlin VIC Z80 Arcade hardware		yes	https://github.com/MiSTer-devel/Arcade-SegaVICZ80_MiSTer.git		MiSTer-devel_Arcade-SegaVICZ80_MiSTer	not-ported			not-run	not-run	
 _Arcade	Silver Land		no	https://github.com/MiSTer-devel/Arcade-SilverLand_MiSTer.git		MiSTer-devel_Arcade-SilverLand_MiSTer	not-ported			not-run	not-run	
@@ -152,6 +158,7 @@ _Arcade	TIA-MC1		no	https://github.com/MiSTer-devel/Arcade-TIAMC1_MiSTer.git		Mi
 _Arcade	Time Pilot '84		no	https://github.com/MiSTer-devel/Arcade-TimePilot84_MISTer.git		MiSTer-devel_Arcade-TimePilot84_MISTer	not-ported			not-run	not-run	
 _Arcade	Time Pilot		no	https://github.com/MiSTer-devel/Arcade-TimePilot_MiSTer.git		MiSTer-devel_Arcade-TimePilot_MiSTer	not-ported			not-run	not-run	
 _Arcade	T.N.K. III		no	https://github.com/MiSTer-devel/Arcade-TNKIII_MiSTer.git		MiSTer-devel_Arcade-TNKIII_MiSTer	not-ported			not-run	not-run	
+_Arcade	Toobin'		yes	https://github.com/MiSTer-devel/Arcade-Toobin_MiSTer.git		MiSTer-devel_Arcade-Toobin_MiSTer	not-ported			not-run	not-run	
 _Arcade	Traverse USA		no	https://github.com/MiSTer-devel/Arcade-TraverseUSA_MiSTer.git		MiSTer-devel_Arcade-TraverseUSA_MiSTer	not-ported			not-run	not-run	
 _Arcade	Trio The Punch — Never Forget Me…		yes	https://github.com/MiSTer-devel/Arcade-TrioThePunch_MiSTer.git		MiSTer-devel_Arcade-TrioThePunch_MiSTer	not-ported			not-run	not-run	
 _Arcade	Tropical Angel / New Tropical Angel		yes	https://github.com/MiSTer-devel/Arcade-TropicalAngel_MiSTer.git		MiSTer-devel_Arcade-TropicalAngel_MiSTer	not-ported			not-run	not-run	
@@ -174,7 +181,7 @@ _Computer	Alice MC10	AliceMC10	yes	https://github.com/MiSTer-devel/AliceMC10_MiS
 _Computer	Altair 8800	Altair8800	no	https://github.com/MiSTer-devel/Altair8800_Mister.git		MiSTer-devel_Altair8800_Mister	not-ported			not-run	not-run	
 _Computer	Amstrad PCW	Amstrad PCW	yes	https://github.com/MiSTer-devel/Amstrad-PCW_MiSTer.git		MiSTer-devel_Amstrad-PCW_MiSTer	not-ported			not-run	not-run	
 _Computer	Amstrad CPC 6128	Amstrad	yes	https://github.com/MiSTer-devel/Amstrad_MiSTer.git		MiSTer-devel_Amstrad_MiSTer	not-ported			not-run	not-run	
-_Computer	ao486 (PC 486)	AO486	no	https://github.com/MiSTer-devel/ao486_MiSTer.git		MiSTer-devel_ao486_MiSTer	not-ported			not-run	not-run	
+_Computer	ao486 (PC 486)	AO486	no	https://github.com/MiSTer-devel/ao486_MiSTer.git		MiSTer-devel_ao486_MiSTer	built	scripts/build-ao486-v2.sh	artifacts/ao486-v2/AO486_v2.rbf	pass	pending	
 _Computer	Apogee	APOGEE	no	https://github.com/MiSTer-devel/Apogee_MiSTer.git		MiSTer-devel_Apogee_MiSTer	not-ported			not-run	not-run	
 _Computer	Apple I	APPLE-I	no	https://github.com/MiSTer-devel/Apple-I_MiSTer.git		MiSTer-devel_Apple-I_MiSTer	packaged	scripts/build-apple1.sh	artifacts/apple1/Apple-I_20260814_FDCD.rbf	pass	pending	
 _Computer	Apple II+/IIe	Apple-II	no	https://github.com/MiSTer-devel/Apple-II_MiSTer.git		MiSTer-devel_Apple-II_MiSTer	not-ported			not-run	not-run	
@@ -215,7 +222,7 @@ _Computer	Oric-1, Oric Atmos	Oric	no	https://github.com/MiSTer-devel/Oric_MiSTer
 _Computer	NEC PC-8801	PC8801	yes	https://github.com/MiSTer-devel/PC88_MiSTer.git		MiSTer-devel_PC88_MiSTer	not-ported			not-run	not-run	
 _Computer	PCjr	PCjr	yes	https://github.com/MiSTer-devel/PCjr_MiSTer.git		MiSTer-devel_PCjr_MiSTer	not-ported			not-run	not-run	
 _Computer	IBM PC/XT EGA	PCXT-EGA	yes	https://github.com/MiSTer-devel/PCXT-EGA_MiSTer.git		MiSTer-devel_PCXT-EGA_MiSTer	not-ported			not-run	not-run	
-_Computer	IBM PC/XT	PCXT	yes	https://github.com/MiSTer-devel/PCXT_MiSTer.git		MiSTer-devel_PCXT_MiSTer	built	scripts/build-pcxt.sh	artifacts/pcxt/PCXT_20260815.rbf	pass	pending	
+_Computer	IBM PC/XT	PCXT	yes	https://github.com/MiSTer-devel/PCXT_MiSTer.git		MiSTer-devel_PCXT_MiSTer	built	scripts/build-pcxt-v2.sh	artifacts/pcxt-v2/PCXT_v2.rbf	pass	pending	
 _Computer	DEC PDP-1	PDP1	no	https://github.com/MiSTer-devel/PDP1_MiSTer.git		MiSTer-devel_PDP1_MiSTer	not-ported			not-run	not-run	
 _Computer	Commodore PET	PET2001	no	https://github.com/MiSTer-devel/PET2001_MiSTer.git		MiSTer-devel_PET2001_MiSTer	not-ported			not-run	not-run	
 _Computer	PMD 85	PMD85	yes	https://github.com/MiSTer-devel/PMD85_MiSTer.git		MiSTer-devel_PMD85_MiSTer	not-ported			not-run	not-run	
@@ -245,11 +252,11 @@ _Console	3DO	3DO	yes	https://github.com/MiSTer-devel/3DO_MiSTer.git		MiSTer-deve
 _Console	Adventure Vision	AVision	no	https://github.com/MiSTer-devel/AdventureVision_MiSTer.git		MiSTer-devel_AdventureVision_MiSTer	not-ported			not-run	not-run	
 _Console	Emerson Arcadia 2001	Arcadia	no	https://github.com/MiSTer-devel/Arcadia_MiSTer.git		MiSTer-devel_Arcadia_MiSTer	not-ported			not-run	not-run	
 _Console	Bally Astrocade	Astrocade	no	https://github.com/MiSTer-devel/Astrocade_MiSTer.git		MiSTer-devel_Astrocade_MiSTer	not-ported			not-run	not-run	
-_Console	Atari 7800, 2600	ATARI7800	yes	https://github.com/MiSTer-devel/Atari7800_MiSTer.git		MiSTer-devel_Atari7800_MiSTer	not-ported			not-run	not-run	
+_Console	Atari 7800, 2600	ATARI7800	yes	https://github.com/MiSTer-devel/Atari7800_MiSTer.git		MiSTer-devel_Atari7800_MiSTer	built	scripts/build-atari7800-v2.sh	artifacts/atari7800-v2/Atari7800_v2.rbf	pass	load-pass	Combined 7800/2600 persona; Agilex 5 fit 58% ALMs; DQ setup/hold +2.849/+8.668 ns; zero unconstrained endpoints; guarded board load passed, content test pending
 _Console	Atari 5200	ATARI5200	yes	https://github.com/MiSTer-devel/Atari800_MiSTer.git		MiSTer-devel_Atari800_MiSTer	not-ported			not-run	not-run	Ignore-Extra-Releases-Files
 _Console	Atari Lynx	AtariLynx	yes	https://github.com/MiSTer-devel/AtariLynx_MiSTer.git		MiSTer-devel_AtariLynx_MiSTer	not-ported			not-run	not-run	
 _Console	Atari Lynx 2P	AtariLynx	yes	https://github.com/MiSTer-devel/AtariLynx_MiSTer.git	Lynx2P	MiSTer-devel_AtariLynx_MiSTer	not-ported			not-run	not-run	
-_Console	AY-3-8500 (Pong-on-a-chip)	AY-3-8500	no	https://github.com/MiSTer-devel/AY-3-8500-MiSTer.git		MiSTer-devel_AY-3-8500-MiSTer	not-ported			not-run	not-run	
+_Console	AY-3-8500 (Pong-on-a-chip)	AY-3-8500	no	https://github.com/MiSTer-devel/AY-3-8500-MiSTer.git		MiSTer-devel_AY-3-8500-MiSTer	built	scripts/build-ay38500-v2.sh	artifacts/ay38500-v2/AY-3-8500_v2.rbf	pass	pending	
 _Console	BBC Bridge Companion	BBCBridgeCompanion	no	https://github.com/MiSTer-devel/BBCBridgeCompanion_MiSTer.git		MiSTer-devel_BBCBridgeCompanion_MiSTer	not-ported			not-run	not-run	
 _Console	Casio PV-1000	Casio_PV-1000	no	https://github.com/MiSTer-devel/Casio_PV-1000_MiSTer.git		MiSTer-devel_Casio_PV-1000_MiSTer	not-ported			not-run	not-run	
 _Console	Philips CD-i	CD-i	yes	https://github.com/MiSTer-devel/CDi_MiSTer.git		MiSTer-devel_CDi_MiSTer	not-ported			not-run	not-run	
@@ -264,20 +271,21 @@ _Console	Game Boy Advance	GBA	no	https://github.com/MiSTer-devel/GBA_MiSTer.git	
 _Console	Game Boy Advance 2P	GBA2P	yes	https://github.com/MiSTer-devel/GBA_MiSTer.git	GBA2P	MiSTer-devel_GBA_MiSTer	not-ported			not-run	not-run	
 _Console	Game & Watch	GameNWatch	yes	https://github.com/MiSTer-devel/GnW_MiSTer.git		MiSTer-devel_GnW_MiSTer	not-ported			not-run	not-run	
 _Console	Intellivision	Intellivision	no	https://github.com/MiSTer-devel/Intv_MiSTer.git		MiSTer-devel_Intv_MiSTer	not-ported			not-run	not-run	
-_Console	Atari Jaguar	Jaguar	yes	https://github.com/MiSTer-devel/Jaguar_MiSTer.git		MiSTer-devel_Jaguar_MiSTer	not-ported			not-run	not-run	
+_Console	Atari Jaguar	Jaguar	yes	https://github.com/MiSTer-devel/Jaguar_MiSTer.git		MiSTer-devel_Jaguar_MiSTer	built	scripts/build-jaguar-v2.sh	artifacts/jaguar-v2/Jaguar_v2.rbf	pass	load-pass	53.125 MHz core and 106.25 MHz SDRAM; DQ setup +1.664 ns; zero unconstrained endpoints; guarded board load passed, BIOS/content test pending
 _Console	Sega CD/Mega-CD	MegaCD	yes	https://github.com/MiSTer-devel/MegaCD_MiSTer.git		MiSTer-devel_MegaCD_MiSTer	not-ported			not-run	not-run	
 _Console	Sega Mega Drive/Genesis	MegaDrive	yes	https://github.com/MiSTer-devel/MegaDrive_MiSTer.git		MiSTer-devel_MegaDrive_MiSTer	not-ported			not-run	not-run	
 _Console	Nichibutsu My Vision	MyVision	no	https://github.com/MiSTer-devel/MyVision_MiSTer.git		MiSTer-devel_MyVision_MiSTer	not-ported			not-run	not-run	
-_Console	Nintendo 64	N64	yes	https://github.com/MiSTer-devel/N64_MiSTer.git		MiSTer-devel_N64_MiSTer	not-ported			not-run	not-run	
+_Console	Nintendo 64	N64	yes	https://github.com/MiSTer-devel/N64_MiSTer.git		MiSTer-devel_N64_MiSTer	built	scripts/build-n64-v2.sh	artifacts/n64-v2/N64_v2_ntsc_bringup.rbf	pass	pending	Fixed-NTSC bring-up; Agilex RAM adapters complete; 93% ALMs; global setup +0.859 ns; zero unconstrained endpoints; hardware validation pending
 _Console	Neo Geo MVS/AES	NEOGEO	yes	https://github.com/MiSTer-devel/NeoGeo_MiSTer.git		MiSTer-devel_NeoGeo_MiSTer	not-ported			not-run	not-run	
-_Console	Nintendo Entertainment System (NES)	NES	yes	https://github.com/MiSTer-devel/NES_MiSTer.git		MiSTer-devel_NES_MiSTer	packaged	scripts/build-nes.sh	artifacts/nes/NES_20260814_FDCD.rbf	pass	pending	
+_Console	Nintendo Entertainment System (NES)	NES	yes	https://github.com/MiSTer-devel/NES_MiSTer.git		MiSTer-devel_NES_MiSTer	packaged	scripts/build-nes-v2.sh	artifacts/nes-v2/NES_v2.rbf	pass	pending	
+_Console	Neo Geo Pocket Color	NGPC	yes	https://github.com/MiSTer-devel/NGPC_MiSTer.git		MiSTer-devel_NGPC_MiSTer	not-ported			not-run	not-run	
 _Console	Magnavox Odyssey²	ODYSSEY2	no	https://github.com/MiSTer-devel/Odyssey2_MiSTer.git		MiSTer-devel_Odyssey2_MiSTer	not-ported			not-run	not-run	
 _Console	Pokémon Mini	PokemonMini	yes	https://github.com/MiSTer-devel/PokemonMini_MiSTer.git		MiSTer-devel_PokemonMini_MiSTer	not-ported			not-run	not-run	
-_Console	PlayStation (PSX)	PSX	yes	https://github.com/MiSTer-devel/PSX_MiSTer.git		MiSTer-devel_PSX_MiSTer	not-ported			not-run	not-run	
+_Console	PlayStation (PSX)	PSX	yes	https://github.com/MiSTer-devel/PSX_MiSTer.git		MiSTer-devel_PSX_MiSTer	built	scripts/build-psx-v2.sh	artifacts/psx-v2/PSX_v2_ntsc_bringup.rbf	pass	load-pass	Agilex SDRAM capture pipeline; global setup +0.477 ns; zero unconstrained endpoints; guarded board load passed, BIOS/content test pending
 _Console	Sega 32X	S32X	yes	https://github.com/MiSTer-devel/S32X_MiSTer.git		MiSTer-devel_S32X_MiSTer	not-ported			not-run	not-run	
-_Console	Sega Saturn	Saturn	yes	https://github.com/MiSTer-devel/Saturn_MiSTer.git		MiSTer-devel_Saturn_MiSTer	not-ported			not-run	not-run	
+_Console	Sega Saturn	Saturn	yes	https://github.com/MiSTer-devel/Saturn_MiSTer.git		MiSTer-devel_Saturn_MiSTer	built	scripts/build-saturn-v2.sh	artifacts/saturn-v2/Saturn_v2_ntsc_light_bringup.rbf	pass	pending	Quartus 25 clean build; LIGHT_SATURN maps VDP2 and SCSP to native SDRAM, with remaining memory on HPS LPDDR4; hardware validation pending
 _Console	Super Game Boy	SGB	yes	https://github.com/MiSTer-devel/SGB_MiSTer.git		MiSTer-devel_SGB_MiSTer	not-ported			not-run	not-run	
-_Console	Sega Master System, Game Gear	SMS	yes	https://github.com/MiSTer-devel/SMS_MiSTer.git		MiSTer-devel_SMS_MiSTer	built	scripts/build-sms.sh	artifacts/sms/SMS_20260814_FDCD.rbf	pass	pending	
+_Console	Sega Master System, Game Gear	SMS	yes	https://github.com/MiSTer-devel/SMS_MiSTer.git		MiSTer-devel_SMS_MiSTer	built	scripts/build-sms-v2.sh	artifacts/sms-v2/SMS_v2.rbf	pass	pending	
 _Console	Sega Game Gear 2P	GameGear2P	yes	https://github.com/MiSTer-devel/SMS_MiSTer.git	GameGear2P	MiSTer-devel_SMS_MiSTer	not-ported			not-run	not-run	
 _Console	Super Nintendo Entertainment System (SNES)	SNES	yes	https://github.com/MiSTer-devel/SNES_MiSTer.git		MiSTer-devel_SNES_MiSTer	packaged	scripts/build-snes.sh	artifacts/snes/SNES_20260814_FDCD.rbf	pass	pending	
 _Console	Bandai Super Vision 8000	SuperVision8000	no	https://github.com/MiSTer-devel/Super_Vision_8000_MiSTer.git		MiSTer-devel_Super_Vision_8000_MiSTer	not-ported			not-run	not-run	
@@ -290,7 +298,7 @@ _Console	Virtual Boy	VirtualBoy	yes	https://github.com/MiSTer-devel/VirtualBoy_M
 _Console	WonderSwan	WonderSwan	yes	https://github.com/MiSTer-devel/WonderSwan_MiSTer.git		MiSTer-devel_WonderSwan_MiSTer	not-ported			not-run	not-run	
 _Other	Arduboy	Arduboy	no	https://github.com/MiSTer-devel/Arduboy_MiSTer.git		MiSTer-devel_Arduboy_MiSTer	not-ported			not-run	not-run	
 _Other	Chess	Chess	no	https://github.com/MiSTer-devel/Chess_MiSTer.git		MiSTer-devel_Chess_MiSTer	not-ported			not-run	not-run	
-_Other	CHIP-8	Chip8	no	https://github.com/MiSTer-devel/Chip8_MiSTer.git		MiSTer-devel_Chip8_MiSTer	not-ported			not-run	not-run	
+_Other	CHIP-8	Chip8	no	https://github.com/MiSTer-devel/Chip8_MiSTer.git		MiSTer-devel_Chip8_MiSTer	built	scripts/build-chip8-v2.sh	artifacts/chip8-v2/CHIP-8_v2.rbf	pass	pending	
 _Other	Donut	Donut	no	https://github.com/MiSTer-devel/Donut_MiSTer.git		MiSTer-devel_Donut_MiSTer	not-ported			not-run	not-run	
 _Other	Epoch Galaxy II	EpochGalaxyII	no	https://github.com/MiSTer-devel/EpochGalaxy2_MiSTer.git		MiSTer-devel_EpochGalaxy2_MiSTer	not-ported			not-run	not-run	
 _Other	Flappy Bird	FLAPPY	no	https://github.com/MiSTer-devel/FlappyBird_MiSTer.git		MiSTer-devel_FlappyBird_MiSTer	not-ported			not-run	not-run	
@@ -305,4 +313,4 @@ _Utility	Input test	InputTest	no	https://github.com/MiSTer-devel/InputTest_MiSTe
 _Utility	SDRAM board test	MEMTEST	yes	https://github.com/MiSTer-devel/MemTest_MiSTer.git		MiSTer-devel_MemTest_MiSTer	packaged	scripts/build-memtest.sh	artifacts/memtest/MemTest_20260814_FDCD.rbf	pass	pending	
 _Utility	Boot Menu		no	https://github.com/MiSTer-devel/Menu_MiSTer.git		MiSTer-devel_Menu_MiSTer	not-ported			not-run	not-run	
 _Utility	MiSTer Laggy	MiSTerLaggy	no	https://github.com/MiSTer-devel/MiSTerLaggy_MiSTer.git		MiSTer-devel_MiSTerLaggy_MiSTer	not-ported			not-run	not-run	
-_Computer	IBM PC110	PC110	no	https://github.com/ahmadexp/PC110_MiSTer.git		ahmadexp_PC110_MiSTer	packaged	scripts/build-pc110.sh	artifacts/pc110/IBM_PC110_20260814_FDCD.rbf	pass	pending	DE25 supplemental core
+_Computer	IBM PC110	PC110	no	https://github.com/ahmadexp/PC110_MiSTer.git		ahmadexp_PC110_MiSTer	packaged	scripts/build-pc110.sh	artifacts/pc110/IBM_PC110_20260825_FDCD_VERTICAL_ACCUM_FIX.rbf	pass	pending	DE25 supplemental core

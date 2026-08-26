@@ -9,6 +9,19 @@ if {[get_collection_size $de25_board_ref_clock] == 0} {
     set de25_board_ref_clock \
         [get_clocks -nowarn -of_objects [get_ports CLOCK0_50]]
 }
+set de25_board_aux_clocks {}
+foreach de25_aux_port_name {CLOCK1_50 CLOCK2_50} {
+    set de25_aux_port [get_ports -nowarn $de25_aux_port_name]
+    if {[get_collection_size $de25_aux_port] == 1} {
+        set de25_aux_clock [get_clocks -nowarn -of_objects $de25_aux_port]
+        if {[get_collection_size $de25_aux_clock] == 0} {
+            create_clock -name $de25_aux_port_name -period 20.000 $de25_aux_port
+            set de25_aux_clock \
+                [get_clocks -nowarn -of_objects $de25_aux_port]
+        }
+        lappend de25_board_aux_clocks $de25_aux_clock
+    }
+}
 set de25_hps_ref_clock \
     [get_clocks -nowarn -of_objects [get_ports HPS_CLK_25]]
 if {[get_collection_size $de25_hps_ref_clock] == 0} {
@@ -58,7 +71,7 @@ if {[get_collection_size $de25_ao486_mpu_target] == 1} {
 # Quartus reads project SDC before automatically discovered IP constraints.
 # Source the two generated IOPLL constraints so their clock objects exist when
 # the asynchronous groups below are evaluated.
-foreach pll_root {mister_pll menu_core_pll inputtest_core_pll memtest_core_pll memtest_core_pll_cal memtest_video_pll nes_core_pll_cal snes_core_pll_cal minimig_core_pll_cal tgfx16_core_pll sms_core_pll_cal pcxt_core_pll ao486_core_pll_cal} {
+foreach pll_root {mister_pll menu_core_pll inputtest_core_pll memtest_core_pll memtest_core_pll_cal memtest_video_pll nes_core_pll_cal snes_core_pll_cal minimig_core_pll_cal tgfx16_core_pll sms_core_pll_cal pcxt_core_pll ao486_core_pll_cal ay38500_core_pll chip8_core_pll atari7800_core_pll jaguar_core_pll psx_core_pll psx_video_pll n64_core_pll n64_video_pll saturn_core_pll} {
     set pll_sdc_root [file normalize [file join [file dirname [info script]] .. ip ip $pll_root]]
     foreach pll_sdc [glob -nocomplain [file join $pll_sdc_root * altera_iopll_2100 synth *.sdc]] {
         source $pll_sdc
@@ -86,6 +99,11 @@ set de25_async_clock_groups {}
 if {[get_collection_size $de25_board_ref_clock] > 0} {
     lappend de25_async_clock_groups $de25_board_ref_clock
 }
+foreach de25_board_aux_clock $de25_board_aux_clocks {
+    if {[get_collection_size $de25_board_aux_clock] > 0} {
+        lappend de25_async_clock_groups $de25_board_aux_clock
+    }
+}
 if {[get_collection_size $de25_jtag_clock] > 0} {
     lappend de25_async_clock_groups $de25_jtag_clock
 }
@@ -100,6 +118,21 @@ if {[get_collection_size $de25_shell_memory_clocks] > 0} {
 }
 if {[get_collection_size $de25_shell_video_clock] > 0} {
     lappend de25_async_clock_groups $de25_shell_video_clock
+}
+
+# PSX and other large personas use a second PLL instance for their native
+# video pipeline. The upstream cores contain explicit asynchronous transfer
+# logic between this domain and the main core PLL. Treating both PLLs as
+# phase-related creates a zero-nanosecond relationship and thousands of false
+# setup violations.
+set de25_persona_video_clocks [get_clocks -nowarn {
+    *|pll2|impl|iopll_0|iopll_0_outclk*
+    *|pll2|pll|iopll_0|iopll_0_outclk*
+    *|video_pll|impl|iopll_0|iopll_0_outclk*
+    *|vpll|impl|iopll_0|iopll_0_outclk*
+}]
+if {[get_collection_size $de25_persona_video_clocks] > 0} {
+    lappend de25_async_clock_groups $de25_persona_video_clocks
 }
 
 # NES and SNES expose more than two outputs and intentionally isolate their
@@ -245,13 +278,28 @@ set de25_sdram_clock [get_clocks -nowarn {
     *|pll|pll|iopll_0|iopll_0_outclk3
     *|pll_all|impl|iopll_0|iopll_0_outclk1
     *|bank0_iopll|bank0_iopll_outclk2
+    *|pll|pll|cpu_pll|cpu_pll_outclk1
 }]
-# SMS is the only three-output dynamic core PLL. Its C1 output is the
-# forwarded SDRAM clock, while C0 and C2 are controller-aligned clocks.
-if {[get_collection_size $de25_core_pll_clocks] == 3} {
-    set de25_sdram_clock [get_clocks -nowarn {
-        *|pll|pll|iopll_0|iopll_0_outclk1
+# SMS forwards C1 to SDRAM. PSX C3 is a dedicated phase-related replacement
+# for the Cyclone V DDR clock primitive, and C4 captures its returning data.
+# Detect these hierarchies directly rather than inferring them from the PLL
+# output count.
+set de25_sms_sdram_clock [get_clocks -nowarn {
+    *|pll|pll|iopll_0|iopll_0_outclk1
+}]
+if {[get_collection_size $de25_sms_sdram_clock] == 1} {
+    set de25_sdram_clock $de25_sms_sdram_clock
+}
+set de25_psx_sdram_capture_clock [get_clocks -nowarn {
+    *|pll|impl|iopll_0|iopll_0_outclk4
+}]
+if {[get_collection_size $de25_psx_sdram_capture_clock] == 1} {
+    set de25_psx_sdram_clock [get_clocks -nowarn {
+        *|pll|impl|iopll_0|iopll_0_outclk3
     }]
+    if {[get_collection_size $de25_psx_sdram_clock] == 1} {
+        set de25_sdram_clock $de25_psx_sdram_clock
+    }
 }
 if {[get_collection_size $de25_sdram_clock] == 1} {
     set de25_sdram_clock_port [get_ports DRAM_CLK]
@@ -276,6 +324,7 @@ if {[get_collection_size $de25_sdram_clock] == 1} {
     set de25_sdram_capture_registers [get_keepers -nowarn {
         *|sdr|data_capture[*]
         *|sdram|data_capture[*]
+        *|gus|sdram|data[*]
     }]
     if {[get_collection_size $de25_sdram_capture_registers] > 0} {
         set_multicycle_path -setup 2 -from $de25_sdram_dq \
@@ -312,6 +361,15 @@ if {[get_collection_size $de25_sdram_clock] == 1} {
 set de25_audio_sample_registers [get_keepers -nowarn {*audio|samples*}]
 if {[get_collection_size $de25_audio_sample_registers] > 0} {
     set_false_path -to $de25_audio_sample_registers
+}
+# Platform V2 samples each asynchronous core channel through an explicit
+# meta/sync pair. Only the first stage accepts an unrelated core clock.
+set de25_audio_sample_meta [get_keepers -nowarn {
+    *audio|left_meta[*]
+    *audio|right_meta[*]
+}]
+if {[get_collection_size $de25_audio_sample_meta] > 0} {
+    set_false_path -to $de25_audio_sample_meta
 }
 # reset_request is generated in the core system domain. audio_reset_pipe is
 # its assertion/release synchronizer in the unrelated fixed I2S domain, so
@@ -443,11 +501,23 @@ set_false_path -from [get_keepers {*sundancemesa_hps_inst~intosc_clk.reg}]
 # intentionally not timed as normal source-synchronous SDRAM transactions.
 set de25_pll_control_registers [get_keepers -nowarn {
     *|tennm_ph2_iopll~pll_ctrl_reg
+    *|pll|reconfigure|busy*
+    *|pll|reconfigure|error*
 }]
 if {[get_collection_size $de25_pll_control_registers] > 0} {
     set_false_path -from $de25_pll_control_registers -to [get_ports {
         DRAM_CKE DRAM_CS_n[*] DRAM_DQ[*]
     }]
+    # GUS samples lock loss only to restart and quiesce its controller. The
+    # variable clock is not valid while that hard-IP status changes, so this
+    # is an asynchronous safety/reset path rather than a functional transfer.
+    set de25_gus_sdram_registers [get_keepers -nowarn {
+        *|gus|sdram|*
+    }]
+    if {[get_collection_size $de25_gus_sdram_registers] > 0} {
+        set_false_path -from $de25_pll_control_registers \
+            -to $de25_gus_sdram_registers
+    }
 }
 
 # The reset pipes assert through their asynchronous clear inputs, then release

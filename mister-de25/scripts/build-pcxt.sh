@@ -3,7 +3,8 @@ set -euo pipefail
 
 platform_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 workspace_root=$(cd "$platform_root/.." && pwd)
-project=DE25_MISTER_PCXT
+project=${DE25_PCXT_PROJECT:-DE25_MISTER_PCXT}
+output_directory=${DE25_PCXT_OUTPUT_DIRECTORY:-output_files_pcxt}
 output_rbf=${DE25_PCXT_OUTPUT_RBF:-$platform_root/artifacts/pcxt/PCXT_20260815.rbf}
 hps_bootloader=${DE25_HPS_BOOTLOADER:-$workspace_root/de25-nano/artifacts/u-boot-spl-dtb.hex}
 image=${QUARTUS_IMAGE:-alterafpga/quartus-pro:25.3.1-patch1.02-agilex5}
@@ -42,16 +43,17 @@ generate_and_build() {
         --rev="$project" --script=create_mister_hps.tcl
     cd "$platform_root/quartus"
     quartus_sh --clean -c "$project" "$project"
-    quartus_ipgenerate "$project" -c "$project" --run_default_mode_op
+    quartus_ipgenerate "$project" -c "$project" --run_default_mode_op \
+        --parallel=off
     "$platform_root/scripts/quartus-syn-de25.sh" "$project"
     quartus_fit "$project" -c "$project"
     quartus_asm "$project" -c "$project"
     quartus_sta "$project" -c "$project"
     ../scripts/check-timing-summary.sh \
-        "output_files_pcxt/$project.sta.summary"
+        "$output_directory/$project.sta.summary"
     quartus_sta -t ../scripts/report-sdram-timing.tcl "$project"
     "$platform_root/scripts/make-hps-first-rbf.sh" \
-        "output_files_pcxt/$project.sof" "$output_rbf" "$hps_bootloader"
+        "$output_directory/$project.sof" "$output_rbf" "$hps_bootloader"
 }
 
 if command -v quartus_sh >/dev/null 2>&1; then
@@ -83,6 +85,8 @@ fi
 [[ -z ${DE25_HPS_RESET_RECOVERY:-} ]] || docker_args+=( -e "DE25_HPS_RESET_RECOVERY=$DE25_HPS_RESET_RECOVERY" )
 [[ -z ${DE25_HPS_RESET_V1_REPRO:-} ]] || docker_args+=( -e "DE25_HPS_RESET_V1_REPRO=$DE25_HPS_RESET_V1_REPRO" )
 [[ -z ${DE25_HPS_RESET_V1_RECOVERY:-} ]] || docker_args+=( -e "DE25_HPS_RESET_V1_RECOVERY=$DE25_HPS_RESET_V1_RECOVERY" )
+[[ -z ${DE25_PCXT_PROJECT:-} ]] || docker_args+=( -e "DE25_PCXT_PROJECT=$DE25_PCXT_PROJECT" )
+[[ -z ${DE25_PCXT_OUTPUT_DIRECTORY:-} ]] || docker_args+=( -e "DE25_PCXT_OUTPUT_DIRECTORY=$DE25_PCXT_OUTPUT_DIRECTORY" )
 if [[ -n ${DE25_EXPECTED_HPS_IO_HASH_FILE:-} ]]; then
     expected_hash_file=$("$platform_root/scripts/docker-workspace-path.sh" \
         "$workspace_root" "$DE25_EXPECTED_HPS_IO_HASH_FILE")

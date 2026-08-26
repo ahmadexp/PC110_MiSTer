@@ -52,3 +52,10 @@ if {[llength $pc110_async_clock_groups] < $pc110_expected_clock_groups} {
     }
     eval $pc110_clock_group_command
 }
+
+# The optional Si5332B probe is a self-timed 25 kHz open-drain bus. Its input
+# pins enter explicit two-register synchronizers, and its output transitions
+# are protocol-timed by the 50 MHz state machine rather than an external
+# synchronous receiver. They therefore have no board-level setup/hold delay.
+set_false_path -from [get_ports {SI5332_SCL SI5332_SDA}]
+set_false_path -to   [get_ports {SI5332_SCL SI5332_SDA}]

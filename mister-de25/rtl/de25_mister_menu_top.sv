@@ -7,8 +7,17 @@
 // replaced for each core build.
 module de25_mister_top (
     input  wire         CLOCK0_50,
+    input  wire         CLOCK1_50,
+    input  wire         CLOCK2_50,
     input  wire  [1:0]  KEY,
     input  wire  [3:0]  SW,
+`ifdef DE25_PLATFORM_V2
+    inout  wire         SI5332_SDA,
+    inout  wire         SI5332_SCL,
+`elsif DE25_SI5332_ADDRESS_PROBE
+    inout  wire         SI5332_SDA,
+    inout  wire         SI5332_SCL,
+`endif
     output logic [7:0]  LED,
 
     output wire         DRAM_CLK,
@@ -102,7 +111,21 @@ module de25_mister_top (
 `endif
     logic [2:0] hps_led_out;
     logic [26:0] heartbeat = '0;
+`ifdef DE25_PLATFORM_V2
+    wire [23:0] v2_clock1_frequency_khz;
+    wire [23:0] v2_clock2_frequency_khz;
+    wire [31:0] v2_si5332_probe_status;
+    wire [95:0] v2_si5332_identity;
+    wire [6:0] v2_si5332_address;
+    wire v2_si5332_identity_valid;
+    wire v2_si5332_fault;
+    wire v2_external_clocks_ready;
+`endif
 `ifdef DE25_PC110_CORE
+    logic [23:0] clock1_frequency_khz;
+    logic [23:0] clock2_frequency_khz;
+    logic clock1_sample_toggle;
+    logic clock2_sample_toggle;
     wire pc110_clk_sys;
     wire pc110_clk_uart1;
     wire pc110_clk_mpu;
@@ -162,6 +185,28 @@ module de25_mister_top (
         .reset_pending(hps_warm_reset_pending)
     );
 
+`ifdef DE25_PLATFORM_V2
+    de25_platform_v2_clock_service platform_clocks (
+        .clock0_50(CLOCK0_50),
+        .clock1_si5332(CLOCK1_50),
+        .clock2_si5332(CLOCK2_50),
+        .reset(ninit_done | ~KEY[0]),
+        .si5332_scl(SI5332_SCL),
+        .si5332_sda(SI5332_SDA),
+        .clk_hps(clk_hps),
+        .clk_audio(clk_audio),
+        .clk_video(clk_aux),
+        .platform_locked(platform_locked),
+        .external_clocks_ready(v2_external_clocks_ready),
+        .clock1_frequency_khz(v2_clock1_frequency_khz),
+        .clock2_frequency_khz(v2_clock2_frequency_khz),
+        .si5332_probe_status(v2_si5332_probe_status),
+        .si5332_identity(v2_si5332_identity),
+        .si5332_identity_valid(v2_si5332_identity_valid),
+        .si5332_address(v2_si5332_address),
+        .si5332_fault(v2_si5332_fault)
+    );
+`else
     mister_pll platform_clocks (
         .refclk_clk(CLOCK0_50),
         .reset_reset(ninit_done | ~KEY[0]),
@@ -170,6 +215,7 @@ module de25_mister_top (
         .outclk1_clk(clk_audio),
         .outclk2_clk(clk_aux)
     );
+`endif
 
 `ifdef DE25_PC110_CORE
     de25_pc110_core_clocks pc110_clocks (
@@ -197,12 +243,77 @@ module de25_mister_top (
     wire io_osd = gp_out_sync[19] & ~gp_out_sync[18];
     wire shell_osd_status;
     wire [1:0] core_reset_state;
-`ifdef DE25_PLL_DIAGNOSTIC
+
+`ifdef DE25_PC110_CORE
+    de25_clock_frequency_monitor clock1_monitor (
+        .ref_clk(CLOCK0_50),
+        .reset_n(~fabric_reset_request),
+        .measured_clk(CLOCK1_50),
+        .count_khz(clock1_frequency_khz),
+        .sample_toggle(clock1_sample_toggle)
+    );
+
+    de25_clock_frequency_monitor clock2_monitor (
+        .ref_clk(CLOCK0_50),
+        .reset_n(~fabric_reset_request),
+        .measured_clk(CLOCK2_50),
+        .count_khz(clock2_frequency_khz),
+        .sample_toggle(clock2_sample_toggle)
+    );
+
+`ifdef DE25_SI5332_ADDRESS_PROBE
+    wire [31:0] si5332_probe_status;
+    de25_si5332_address_probe si5332_address_probe (
+        .clk(CLOCK0_50),
+        .reset_n(~ninit_done & KEY[0]),
+        .scl(SI5332_SCL),
+        .sda(SI5332_SDA),
+        .status(si5332_probe_status)
+    );
+`endif
+`endif
 `ifdef DE25_AO486_CORE
+`ifdef DE25_PLL_DIAGNOSTIC
     logic [5:0] ao486_ddr_diagnostic;
+    wire  [5:0] ao486_scaler_diagnostic;
+`endif
+`endif
+`ifdef DE25_PLL_DIAGNOSTIC
+`ifdef DE25_PLATFORM_V2
+    logic [5:0] v2_platform_diagnostic;
+    always_comb begin
+        case (gp_out_sync[4:0])
+            // Page 0 preserves the original probe layout:
+            // {fault, done, ACK_6B, ACK_6A, SDA, SCL}.
+            5'd0: v2_platform_diagnostic = v2_si5332_probe_status[7:2];
+            5'd1: v2_platform_diagnostic = {
+                v2_si5332_identity_valid,
+                v2_external_clocks_ready,
+                v2_si5332_fault,
+                v2_si5332_address[2:0]
+            };
+            5'd2,  5'd3,  5'd4,  5'd5,
+            5'd6,  5'd7,  5'd8,  5'd9,
+            5'd10, 5'd11, 5'd12, 5'd13,
+            5'd14, 5'd15, 5'd16, 5'd17:
+                v2_platform_diagnostic =
+                    v2_si5332_identity[(gp_out_sync[4:0] - 2) * 6 +: 6];
+            5'd18, 5'd19, 5'd20, 5'd21:
+                v2_platform_diagnostic =
+                    v2_clock1_frequency_khz[
+                        (gp_out_sync[4:0] - 18) * 6 +: 6];
+            5'd22, 5'd23, 5'd24, 5'd25:
+                v2_platform_diagnostic =
+                    v2_clock2_frequency_khz[
+                        (gp_out_sync[4:0] - 22) * 6 +: 6];
+            5'd26: v2_platform_diagnostic = v2_si5332_address[6:1];
+            default: v2_platform_diagnostic = 6'd0;
+        endcase
+    end
+    wire [5:0] gp_diagnostic = v2_platform_diagnostic;
+`elsif DE25_AO486_CORE
     logic [5:0] ao486_user_meta = 6'd0;
     logic [5:0] ao486_user_sync = 6'd0;
-    wire  [5:0] ao486_scaler_diagnostic;
     wire [31:0] ao486_execution_eip = core.system.ao486.eip;
     wire [63:0] ao486_execution_cs_cache = core.system.ao486.cs_cache;
     wire [31:0] ao486_execution_cs_base = {
@@ -260,14 +371,38 @@ module de25_mister_top (
         pc110_execution_cs_base + pc110_execution_eip;
     logic [5:0] pc110_execution_diagnostic;
     logic [5:0] pc110_ddr_diagnostic = 6'd0;
+    logic [5:0] pc110_clock_diagnostic;
+
+    always_comb begin
+        case (gp_out_sync[2:0])
+            3'd0: pc110_clock_diagnostic = gp_out_sync[22] ?
+                clock2_frequency_khz[5:0] : clock1_frequency_khz[5:0];
+            3'd1: pc110_clock_diagnostic = gp_out_sync[22] ?
+                clock2_frequency_khz[11:6] : clock1_frequency_khz[11:6];
+            3'd2: pc110_clock_diagnostic = gp_out_sync[22] ?
+                clock2_frequency_khz[17:12] : clock1_frequency_khz[17:12];
+            3'd3: pc110_clock_diagnostic = gp_out_sync[22] ?
+                clock2_frequency_khz[23:18] : clock1_frequency_khz[23:18];
+            3'd4: pc110_clock_diagnostic = {
+                4'd0,
+                gp_out_sync[22] ? clock2_sample_toggle :
+                                  clock1_sample_toggle,
+                gp_out_sync[22]
+            };
+            default: pc110_clock_diagnostic = 6'd0;
+        endcase
+    end
 
     // With Main stopped, the HPS may retain reset-release state 2 in GPO
     // bits 31:30 and use bits 2:0 as a read-only page selector. Pages 0-5
     // expose CS-base-plus-EIP. Page 6 identifies every PC110 reset source,
     // Page 7 reports whether the CPU issued a DDR read, whether data returned,
     // whether the PC110 reset-vector beat returned intact, and a response
-    // count. Unused high GPO bits provide diagnostics independently of the
-    // low 16-bit user-I/O data word: bit 27 selects the configuration-ROM
+    // count. GPO bit 23, when bit 24 is clear, selects the auxiliary
+    // board-clock counter. Bit 22 selects CLOCK1_50 or CLOCK2_50 and bits 2:0
+    // select a six-bit result page. Other unused high GPO bits provide
+    // diagnostics independently of the low 16-bit user-I/O data word: bit 27
+    // selects the configuration-ROM
     // byte, bit 28 selects its read counter, and bit 29 selects the live
     // user-I/O select/strobe state plus four synchronized selector bits. The
     // GP bridge itself is clocked by
@@ -278,7 +413,9 @@ module de25_mister_top (
         pc110_scaler_selected_response = pc110_scaler_first_response0;
         pc110_scaler_address_diagnostic_word =
             {4'd0, pc110_scaler_first_read_address};
-        if (gp_out_sync[24]) begin
+        if (gp_out_sync[23] && !gp_out_sync[24]) begin
+            pc110_execution_diagnostic = pc110_clock_diagnostic;
+        end else if (gp_out_sync[24]) begin
             if (gp_out_sync[25]) begin
                 case (gp_out_sync[23:22])
                     2'd0: pc110_scaler_selected_response =
@@ -375,7 +512,16 @@ module de25_mister_top (
             endcase
         end
     end
+`ifdef DE25_SI5332_ADDRESS_PROBE
+    // Fixed read-only result in the existing GP diagnostic field, so JTAG can
+    // read it without writing GPO or competing with a running MiSTer Main. A
+    // failure reports 1 followed by the five-bit state that observed it;
+    // success retains {fault, done, ACK6B, ACK6A, SDA, SCL}.
+    wire [5:0] gp_diagnostic = si5332_probe_status[7] ?
+        {1'b1, si5332_probe_status[15:11]} : si5332_probe_status[7:2];
+`else
     wire [5:0] gp_diagnostic = pc110_execution_diagnostic;
+`endif
 `elsif DE25_NES_CORE
     // Read-only NES execution trace. Capture complete bus samples in the NES
     // clock domain, then leave them stable for the HPS diagnostic pager. This
@@ -506,6 +652,12 @@ module de25_mister_top (
     wire        io_wide = hps_bus[32];
     wire [15:0] io_dout = hps_bus[15:0];
     wire        core_clk_sys = hps_bus[36];
+`ifdef DE25_CORE_HAS_NATIVE_DDRAM_CLK
+    wire        core_ddram_clk;
+    wire        ddram_domain_clk = core_ddram_clk;
+`else
+    wire        ddram_domain_clk = core_clk_sys;
+`endif
     wire        core_domain_reset;
 
     de25_mister_gp_bridge gp_bridge (
@@ -561,6 +713,7 @@ module de25_mister_top (
     (* ASYNC_REG = "TRUE" *) logic [2:0] audio_reset_pipe = 3'b111;
     (* ASYNC_REG = "TRUE" *) logic [2:0] hps_reset_pipe   = 3'b111;
     (* ASYNC_REG = "TRUE" *) logic [2:0] vbuf_reset_pipe  = 3'b111;
+    (* ASYNC_REG = "TRUE" *) logic [2:0] ddram_reset_pipe = 3'b111;
 
     always_ff @(posedge core_clk_sys or posedge fabric_reset_request) begin
         if (fabric_reset_request)
@@ -592,6 +745,14 @@ module de25_mister_top (
 
     assign core_domain_reset = core_reset_pipe[2];
     wire core_reset = core_domain_reset | reset_request;
+
+    always_ff @(posedge ddram_domain_clk or posedge core_reset) begin
+        if (core_reset)
+            ddram_reset_pipe <= 3'b111;
+        else
+            ddram_reset_pipe <= {ddram_reset_pipe[1:0], 1'b0};
+    end
+    wire ddram_domain_reset = ddram_reset_pipe[2];
     wire audio_reset = audio_reset_pipe[2];
     wire hps_domain_reset = hps_reset_pipe[2];
     wire vbuf_domain_reset = vbuf_reset_pipe[2];
@@ -756,7 +917,7 @@ module de25_mister_top (
     // video scaler is enabled. Platform Designer arbitrates this channel and
     // the independent video-buffer channel at the LPDDR4 bridge.
     de25_mister_ddram ddram_bridge (
-        .reset(core_reset),
+        .reset(ddram_domain_reset),
         .core_burstcount(ddram_burstcount),
         .core_address(ddram_address),
         .core_busy(ddram_busy),
@@ -818,7 +979,11 @@ module de25_mister_top (
     wire audio_word_clock;
     wire audio_data;
 
+`ifdef DE25_PLATFORM_V2
+    de25_mister_audio_v2 audio (
+`else
     de25_mister_audio audio (
+`endif
         .clk_audio(clk_audio),
         .reset(audio_reset),
         .core_left(audio_left),
@@ -925,7 +1090,11 @@ module de25_mister_top (
         .SD_MISO(1'b1),
         .SD_CS(),
         .SD_CD(1'b1),
+`ifdef DE25_CORE_HAS_NATIVE_DDRAM_CLK
+        .DDRAM_CLK(core_ddram_clk),
+`else
         .DDRAM_CLK(),
+`endif
         .DDRAM_BUSY(ddram_busy),
         .DDRAM_BURSTCNT(ddram_burstcount),
         .DDRAM_ADDR(ddram_address),
@@ -1014,9 +1183,36 @@ module de25_mister_top (
     assign DRAM_DQ    = 16'bZ;
 `endif
 
-    // MiSTer Main sends the menu bitmap over the OSD SPI chip select. The
-    // original Cyclone V sys_top placed this compositor after core video.
-    // Keeping it in the common DE25 source shell gives every core the same OSD.
+    // MiSTer Main sends the menu bitmap over the OSD SPI chip select. Scaled
+    // cores must composite it after the framebuffer scaler. NES has only 256
+    // source pixels per line, which cannot represent MiSTer's 512-column OSD;
+    // compositing before the scaler therefore aliases the menu into a narrow
+    // vertical strip. The fixed 640x480 side has enough pixels and a continuous
+    // pixel clock. Direct-video personas retain the original core-video input.
+`ifdef DE25_MENU_CORE
+    // Menu already generates the fixed 640x480 platform mode. Keep its OSD
+    // and forwarded HDMI clock in the same core video domain. Routing Menu's
+    // OSD through clk_aux while forwarding core_clk_video creates a real
+    // asynchronous output crossing and produces intermittent tearing/flicker.
+    wire        shell_osd_clk = core_clk_video;
+    wire [23:0] shell_osd_input_data = {core_r, core_g, core_b};
+    wire        shell_osd_input_de = core_de;
+    wire        shell_osd_input_vs = core_vs;
+    wire        shell_osd_input_hs = core_hs;
+`elsif DE25_VIDEO_SCALER
+    wire        shell_osd_clk = clk_aux;
+    wire [23:0] shell_osd_input_data = scaler_video_data;
+    wire        shell_osd_input_de = scaler_video_de;
+    wire        shell_osd_input_vs = scaler_video_vs;
+    wire        shell_osd_input_hs = scaler_video_hs;
+`else
+    wire        shell_osd_clk = core_clk_video;
+    wire [23:0] shell_osd_input_data = {core_r, core_g, core_b};
+    wire        shell_osd_input_de = core_de;
+    wire        shell_osd_input_vs = core_vs;
+    wire        shell_osd_input_hs = core_hs;
+`endif
+
     osd shell_osd (
         .clk_sys(core_clk_sys),
 `ifdef DE25_MENU_CORE
@@ -1024,14 +1220,21 @@ module de25_mister_top (
 `else
         .menu_core(1'b0),
 `endif
+`ifdef DE25_VIDEO_SCALER
+        // Fixed-scaled cores expose a full 16-row MiSTer configuration menu.
+        // Do not depend on the line-8 SPI write arriving before OSD enable.
+        .force_highres(1'b1),
+`else
+        .force_highres(1'b0),
+`endif
         .io_osd(io_osd),
         .io_strobe(io_strobe),
         .io_din(io_din),
-        .clk_video(core_clk_video),
-        .din({core_r, core_g, core_b}),
-        .de_in(core_de),
-        .vs_in(core_vs),
-        .hs_in(core_hs),
+        .clk_video(shell_osd_clk),
+        .din(shell_osd_input_data),
+        .de_in(shell_osd_input_de),
+        .vs_in(shell_osd_input_vs),
+        .hs_in(shell_osd_input_hs),
         .dout(shell_video_data),
         .de_out(shell_video_de),
         .vs_out(shell_video_vs),
@@ -1081,13 +1284,13 @@ module de25_mister_top (
         .bob_deint(1'b0),
         .i_clk(core_clk_video),
         .i_ce(core_ce_pixel),
-        .i_r(shell_video_data[23:16]),
-        .i_g(shell_video_data[15:8]),
-        .i_b(shell_video_data[7:0]),
-        .i_hs(shell_video_hs),
-        .i_vs(shell_video_vs),
+        .i_r(core_r),
+        .i_g(core_g),
+        .i_b(core_b),
+        .i_hs(core_hs),
+        .i_vs(core_vs),
         .i_fl(core_f1),
-        .i_de(shell_video_de),
+        .i_de(core_de),
         .iauto(1'b1),
         .himin(0),
         .himax(0),
@@ -1487,10 +1690,10 @@ module de25_mister_top (
             hdmi_selected_vs <= pc110_hdmi_probe_vs;
 `endif
         end else begin
-            hdmi_selected_data <= scaler_video_data;
-            hdmi_selected_de <= scaler_video_de;
-            hdmi_selected_hs <= scaler_video_hs;
-            hdmi_selected_vs <= scaler_video_vs;
+            hdmi_selected_data <= shell_video_data;
+            hdmi_selected_de <= shell_video_de;
+            hdmi_selected_hs <= shell_video_hs;
+            hdmi_selected_vs <= shell_video_vs;
         end
     end
 `else
@@ -1572,8 +1775,8 @@ module de25_mister_top (
 
     mister_hps hps (
         .clk_100_clk(clk_hps),
-        .mister_ddram_clk_clk(core_clk_sys),
-        .mister_ddram_reset_reset(core_reset),
+        .mister_ddram_clk_clk(ddram_domain_clk),
+        .mister_ddram_reset_reset(ddram_domain_reset),
         .mister_ddram_waitrequest(av_waitrequest),
         .mister_ddram_readdata(av_readdata),
         .mister_ddram_readdatavalid(av_readdatavalid),
@@ -1601,7 +1804,9 @@ module de25_mister_top (
         .reset_reset_n(qsys_reset_n),
         .ninit_done_ninit_done(ninit_done),
         .h2f_reset_reset(h2f_reset),
+`ifndef DE25_HPS_LEGACY_NO_VBUF
         .mister_h2f_bridge_reset_reset(h2f_reset),
+`endif
         .h2f_warm_reset_handshake_reset_req(h2f_warm_reset_req),
         .h2f_warm_reset_handshake_reset_ack(h2f_warm_reset_ack),
         .hps_io_hps_osc_clk(HPS_CLK_25),
@@ -1679,7 +1884,14 @@ module de25_mister_top (
         LED[4] = hdmi_init_done;
         LED[5] = hdmi_hpd_high;
         LED[6] = hdmi_pll_locked;
+`ifdef DE25_PLATFORM_V2
+        // A slow blink means the external clock service needs attention. A
+        // steady light means identity and both output counters are healthy.
+        LED[7] = (hdmi_init_error || v2_si5332_fault) ? heartbeat[20] :
+                 v2_external_clocks_ready;
+`else
         LED[7] = hdmi_init_error ? heartbeat[20] : core_led_user;
+`endif
     end
 
     wire unused = &{1'b0, clk_aux, gp_out_sync[0], io_ack, core_led_power,
@@ -1688,6 +1900,11 @@ module de25_mister_top (
                     hdmi_transmitter_powered, hdmi_monitor_sense,
                     hdmi_tmds_powered, hdmi_edid_ready, hdmi_ddc_state,
                     hdmi_ddc_error, hdmi_raw_status, hps_led_out,
+`ifdef DE25_PLATFORM_V2
+                    v2_clock1_frequency_khz, v2_clock2_frequency_khz,
+                    v2_si5332_identity, v2_si5332_address,
+                    v2_si5332_identity_valid,
+`endif
 `ifdef DE25_CORE_HAS_FB
                     core_fb_format, core_fb_width, core_fb_height,
                     core_fb_base, core_fb_stride, core_fb_force_blank,

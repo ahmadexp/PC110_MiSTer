@@ -29,7 +29,7 @@ module adv7513_init #(
 
     localparam integer TICK_DIV = CLOCK_HZ / (I2C_HZ * 4);
     localparam logic [7:0] ADV7513_WRITE_ADDRESS = 8'h72;
-    localparam integer REGISTER_COUNT = 33;
+    localparam integer REGISTER_COUNT = 34;
 
     localparam logic [7:0] ADV7513_READ_ADDRESS = 8'h73;
     localparam integer STATUS_POLL_TICKS =
@@ -103,35 +103,39 @@ module adv7513_init #(
                  1: register_word = 16'h0100;
                  2: register_word = 16'h0218;
                  3: register_word = 16'h0300;
-                 4: register_word = 16'h0b2e;
-                 5: register_word = 16'h0cbc;
-                 6: register_word = 16'h1472;
-                 7: register_word = 16'h1520;
-                 8: register_word = 16'h1630;
-                 9: register_word = 16'h1846;
-                10: register_word = 16'h4080;
-                11: register_word = 16'h4110;
-                12: register_word = 16'h49a8;
-                13: register_word = 16'h5510;
-                14: register_word = 16'h5608;
-                15: register_word = 16'h96f6;
-                16: register_word = 16'h7307;
-                17: register_word = 16'h761f;
-                18: register_word = 16'h9803;
-                19: register_word = 16'h9902;
-                20: register_word = 16'h9ae0;
-                21: register_word = 16'h9c30;
-                22: register_word = 16'h9d61;
-                23: register_word = 16'ha2a4;
-                24: register_word = 16'ha3a4;
-                25: register_word = 16'ha504;
-                26: register_word = 16'hab40;
-                27: register_word = 16'haf16;
-                28: register_word = 16'hba60;
-                29: register_word = 16'hd1ff;
-                30: register_word = 16'hde10;
-                31: register_word = 16'he460;
-                32: register_word = 16'hfa7d;
+                 // Match MiSTer's production ADV7513 stereo-I2S setup. The
+                 // Terasic reference values enabled four I2S inputs, declared
+                 // eight channels, and selected an incompatible word length.
+                 4: register_word = 16'h0b0e;
+                 5: register_word = 16'h0c04;
+                 6: register_word = 16'h0d10;
+                 7: register_word = 16'h1402;
+                 8: register_word = 16'h1520;
+                 9: register_word = 16'h1630;
+                10: register_word = 16'h1846;
+                11: register_word = 16'h4080;
+                12: register_word = 16'h4110;
+                13: register_word = 16'h49a8;
+                14: register_word = 16'h5510;
+                15: register_word = 16'h5608;
+                16: register_word = 16'h96f6;
+                17: register_word = 16'h7301;
+                18: register_word = 16'h761f;
+                19: register_word = 16'h9803;
+                20: register_word = 16'h9902;
+                21: register_word = 16'h9ae0;
+                22: register_word = 16'h9c30;
+                23: register_word = 16'h9d61;
+                24: register_word = 16'ha2a4;
+                25: register_word = 16'ha3a4;
+                26: register_word = 16'ha504;
+                27: register_word = 16'hab40;
+                28: register_word = 16'haf16;
+                29: register_word = 16'hba60;
+                30: register_word = 16'hd1ff;
+                31: register_word = 16'hde10;
+                32: register_word = 16'he460;
+                33: register_word = 16'hfa7d;
                 default: register_word = 16'h9803;
             endcase
         end

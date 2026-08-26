@@ -11,7 +11,7 @@ set pin_file [open $reference_qsf r]
 set pin_text [read $pin_file]
 close $pin_file
 
-set target_pattern {^(CLOCK0_50|KEY|SW|LED|DRAM_|LPDDR4A_|HDMI_|FPGA_UART_|HPS_|FAN_ALERT_n)}
+set target_pattern {^(CLOCK0_50|CLOCK1_50|CLOCK2_50|KEY|SW|LED|DRAM_|LPDDR4A_|HDMI_|FPGA_UART_|HPS_|FAN_ALERT_n)}
 
 foreach line [split $pin_text "\n"] {
     set words [string trim $line]

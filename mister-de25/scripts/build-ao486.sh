@@ -3,7 +3,8 @@ set -euo pipefail
 
 platform_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 workspace_root=$(cd "$platform_root/.." && pwd)
-project=DE25_MISTER_AO486
+project=${DE25_AO486_PROJECT:-DE25_MISTER_AO486}
+output_directory=${DE25_AO486_OUTPUT_DIRECTORY:-output_files_ao486}
 output_rbf=${DE25_AO486_OUTPUT_RBF:-$platform_root/artifacts/ao486/AO486_20260815.rbf}
 hps_bootloader=${DE25_HPS_BOOTLOADER:-$workspace_root/de25-nano/artifacts/u-boot-spl-dtb.hex}
 image=${QUARTUS_IMAGE:-alterafpga/quartus-pro:25.3.1-patch1.02-agilex5}
@@ -43,16 +44,23 @@ generate_and_build() {
         --rev="$project" --script=create_mister_hps.tcl
     cd "$platform_root/quartus"
     quartus_sh --clean -c "$project" "$project"
-    quartus_ipgenerate "$project" -c "$project" --run_default_mode_op
+    quartus_ipgenerate "$project" -c "$project" --run_default_mode_op \
+        --parallel=off
     "$platform_root/scripts/fix-emif-calibration-ip.sh" ao486_core_pll_cal
     "$platform_root/scripts/quartus-syn-de25.sh" "$project"
+    if grep -Fq 'Output port "SDRAM_DQ_OUT[0..15]"' \
+            "$output_directory/$project.syn.rpt"; then
+        echo "ao486 synthesis removed the GUS SDRAM write datapath" >&2
+        exit 1
+    fi
     quartus_fit "$project" -c "$project"
     quartus_asm "$project" -c "$project"
     quartus_sta "$project" -c "$project"
     ../scripts/check-timing-summary.sh \
-        "output_files_ao486/$project.sta.summary"
+        "$output_directory/$project.sta.summary"
+    quartus_sta -t ../scripts/report-sdram-timing.tcl "$project"
     "$platform_root/scripts/make-hps-first-rbf.sh" \
-        "output_files_ao486/$project.sof" "$output_rbf" "$hps_bootloader"
+        "$output_directory/$project.sof" "$output_rbf" "$hps_bootloader"
 }
 
 if command -v quartus_sh >/dev/null 2>&1; then
@@ -92,6 +100,8 @@ if [[ -n ${DE25_DOCKER_CPUSET:-} ]]; then
 fi
 [[ -z ${LM_LICENSE_FILE:-} ]] || docker_args+=( -e "LM_LICENSE_FILE=$LM_LICENSE_FILE" )
 [[ -z ${SALT_LICENSE_SERVER:-} ]] || docker_args+=( -e "SALT_LICENSE_SERVER=$SALT_LICENSE_SERVER" )
+[[ -z ${DE25_AO486_PROJECT:-} ]] || docker_args+=( -e "DE25_AO486_PROJECT=$DE25_AO486_PROJECT" )
+[[ -z ${DE25_AO486_OUTPUT_DIRECTORY:-} ]] || docker_args+=( -e "DE25_AO486_OUTPUT_DIRECTORY=$DE25_AO486_OUTPUT_DIRECTORY" )
 [[ -z ${DE25_HPS_PARTITION_MODE:-} ]] || docker_args+=( -e "DE25_HPS_PARTITION_MODE=$DE25_HPS_PARTITION_MODE" )
 if [[ -n ${DE25_HPS_PARTITION_QDB:-} ]]; then
     hps_partition_qdb=$("$platform_root/scripts/docker-workspace-path.sh" \

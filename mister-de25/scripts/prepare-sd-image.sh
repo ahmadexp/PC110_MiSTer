@@ -8,6 +8,10 @@ Usage: prepare-sd-image.sh BASE.img OUTPUT.img
 Creates a new DE25-Nano MiSTer image without modifying BASE.img. The image
 contains Menu, every core marked packaged in the locked build matrix, ARM64
 Main, memory reservations, and the runtime FPGA-region loader.
+
+Optional environment:
+  MISTER_DE25_MENU_RBF           Alternate validated Menu RBF
+  MISTER_DE25_PLATFORM_HASH_FILE Matching QSPI HPS I/O hash metadata
 EOF
 }
 
@@ -19,7 +23,8 @@ fi
 base_image=$1
 output_image=$2
 platform_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-menu_rbf=$platform_root/artifacts/menu/menu.rbf
+menu_rbf=${MISTER_DE25_MENU_RBF:-$platform_root/artifacts/menu/menu.rbf}
+platform_hash_file=${MISTER_DE25_PLATFORM_HASH_FILE:-$(dirname "$menu_rbf")/qspi.hps-io-hash}
 core_categories=()
 core_rbfs=()
 while IFS=$'\t' read -r category artifact; do
@@ -53,7 +58,7 @@ for input in "$base_image" "$menu_rbf" "${core_rbfs[@]}" \
     "$kernel_dtb" "$kernel_dtb.sha256" \
     "$kernel_module" "$kernel_module.sha256" \
     "$kernel_modules" "$kernel_modules.sha256" \
-    "$platform_root/artifacts/menu/qspi.hps-io-hash"; do
+    "$platform_hash_file"; do
     if [[ ! -f $input ]]; then
         echo "Input file not found: $input" >&2
         exit 1
@@ -144,8 +149,7 @@ read_hps_hash() {
     printf '%s' "$hash"
 }
 
-platform_hash=$(read_hps_hash \
-    "$platform_root/artifacts/menu/qspi.hps-io-hash")
+platform_hash=$(read_hps_hash "$platform_hash_file")
 for rbf in "$menu_rbf" "${core_rbfs[@]}"; do
     rbf_hash=$(read_hps_hash "$rbf.hps-io-hash")
     if [[ $rbf_hash != "$platform_hash" ]]; then
@@ -214,10 +218,17 @@ prune_superseded_fat_family() {
 
     without_extension=${active_filename%.rbf}
     case $without_extension in
-        *_20[0-9][0-9][0-9][0-9][0-9][0-9]*) ;;
+        *_20[0-9][0-9][0-9][0-9][0-9][0-9]*)
+            stem=${without_extension%%_20[0-9][0-9][0-9][0-9][0-9][0-9]*}
+            ;;
+        *_v2)
+            # A promoted V2 artifact supersedes the older dated release of
+            # the same family, for example NES_v2 replacing
+            # NES_20260814_FDCD. Compare the family name without the V2 tag.
+            stem=${without_extension%_v2}
+            ;;
         *) return ;;
     esac
-    stem=${without_extension%%_20[0-9][0-9][0-9][0-9][0-9][0-9]*}
     normalized_stem=$(normalize_core_stem "$stem")
 
     while IFS= read -r candidate; do
@@ -397,7 +408,7 @@ install -m 0755 "$platform_root/sw/mister-de25-screenshot" \
     "$work_dir/rootfs/usr/bin/mister-de25-screenshot"
 install -m 0755 "$platform_root/sw/mister-de25-migrate" \
     "$work_dir/rootfs/usr/bin/mister-de25-migrate"
-install -m 0644 "$platform_root/artifacts/menu/qspi.hps-io-hash" \
+install -m 0644 "$platform_hash_file" \
     "$work_dir/rootfs/etc/mister-de25/hps-io-hash"
 install -m 0644 "$runtime_catalog" \
     "$work_dir/rootfs/etc/mister-de25/cores.tsv"
@@ -602,10 +613,14 @@ for index in "${!core_rbfs[@]}"; do
     active_filename=${rbf##*/}
     active_without_extension=${active_filename%.rbf}
     case $active_without_extension in
-        *_20[0-9][0-9][0-9][0-9][0-9][0-9]*) ;;
+        *_20[0-9][0-9][0-9][0-9][0-9][0-9]*)
+            active_stem=${active_without_extension%%_20[0-9][0-9][0-9][0-9][0-9][0-9]*}
+            ;;
+        *_v2)
+            active_stem=${active_without_extension%_v2}
+            ;;
         *) continue ;;
     esac
-    active_stem=${active_without_extension%%_20[0-9][0-9][0-9][0-9][0-9][0-9]*}
     active_normalized_stem=$(normalize_core_stem "$active_stem")
     while IFS= read -r candidate; do
         [[ -n $candidate ]] || continue

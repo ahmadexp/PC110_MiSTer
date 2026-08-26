@@ -100,6 +100,16 @@ grep -A10 'void user_io_osd_key_enable' \
 echo "PASS: DE25 Main exposes a maintenance command for opening the OSD"
 
 for qsf in "$target_root"/quartus/DE25_MISTER_*.qsf; do
+    if [[ $qsf == *_V2.qsf ]]; then
+        base_qsf=${qsf%_V2.qsf}.qsf
+        if [[ -f $base_qsf ]]; then
+            grep -q "^source $(basename "$base_qsf")$" "$qsf"
+        else
+            grep -q '^source de25_simple_persona_base.qsf$' "$qsf"
+        fi
+        grep -q '^source de25_platform_v2.qsf$' "$qsf"
+        continue
+    fi
     grep -q 'HPS_INITIALIZATION "HPS First"' "$qsf"
     grep -q 'SYSTEMVERILOG_FILE ../rtl/de25_mister_menu_top.sv' "$qsf"
     grep -q 'SYSTEMVERILOG_FILE ../rtl/de25_hps_warm_reset_handshake.sv' "$qsf"
@@ -109,6 +119,7 @@ for qsf in "$target_root"/quartus/DE25_MISTER_*.qsf; do
         exit 1
     fi
 done
+"$target_root/scripts/test-platform-v2.sh"
 
 grep -q 'quartus_sh --clean -c "$project" "$project"' \
     "$target_root/scripts/build-pc110.sh"
@@ -255,7 +266,7 @@ grep -q 'hps_warm_reset_pending' \
     "$target_root/rtl/de25_mister_menu_top.sv"
 grep -q 'emu core' \
     "$target_root/rtl/de25_mister_menu_top.sv"
-grep -q '\.mister_ddram_clk_clk(core_clk_sys)' \
+grep -q '\.mister_ddram_clk_clk(ddram_domain_clk)' \
     "$target_root/rtl/de25_mister_menu_top.sv"
 grep -q 'add_instance mister_vbuf_bridge altera_avalon_mm_bridge' \
     "$target_root/ip/create_mister_hps.tcl"
@@ -565,6 +576,16 @@ grep -A55 ') video_scaler (' \
 grep -A90 ') video_scaler (' \
     "$target_root/rtl/de25_mister_menu_top.sv" | \
     grep -q '\.avl_write(scaler_ddram_write)'
+grep -q 'shell_osd_input_data = scaler_video_data' \
+    "$target_root/rtl/de25_mister_menu_top.sv"
+grep -q '\.din(shell_osd_input_data)' \
+    "$target_root/rtl/de25_mister_menu_top.sv"
+grep -A40 ') video_scaler (' \
+    "$target_root/rtl/de25_mister_menu_top.sv" | \
+    grep -q '\.i_r(core_r)'
+grep -q 'hdmi_selected_data <= shell_video_data' \
+    "$target_root/rtl/de25_mister_menu_top.sv"
+echo "PASS: scaled cores composite the OSD in the fixed 640x480 domain"
 grep -B8 ') video_scaler (' \
     "$target_root/rtl/de25_mister_menu_top.sv" | \
     grep -q '\.N_DW(128)'
@@ -845,13 +866,41 @@ if grep -q 'ao486_peripheral_pll' \
     exit 1
 fi
 
-if grep -q 'DE25_CORE_HAS_SDRAM=1' \
-    "$target_root/quartus/DE25_MISTER_AO486.qsf"; then
-    echo "FAIL: ao486 still exposes the incomplete GUS SDRAM interface" >&2
-    exit 1
-fi
+grep -q 'DE25_CORE_HAS_SDRAM=1' \
+    "$target_root/quartus/DE25_MISTER_AO486.qsf"
+grep -q 'C_COUNTERS(2)' "$target_root/rtl/de25_ao486_pll.sv"
+grep -q 'cpu_sdram_outclk_clk(clk_sdram_physical)' \
+    "$target_root/rtl/de25_ao486_pll.sv"
+grep -q '^reg \[15:0\] new_data;' \
+    "$target_root/upstream/cores/AO486/rtl/soc/gus/sdram.sv"
+grep -q '^state_t state;' \
+    "$target_root/upstream/cores/AO486/rtl/soc/gus/sdram.sv"
+grep -q 'synthesis removed the GUS SDRAM write datapath' \
+    "$target_root/scripts/build-ao486.sh"
+grep -q 'quartus_sta -t ../scripts/report-sdram-timing.tcl' \
+    "$target_root/scripts/build-ao486.sh"
 
-echo "PASS: ao486 uses the shared video PLL and fabric baud clocks"
+ao486_profiles_tmp=$(mktemp)
+python3 "$target_root/scripts/generate-ao486-pll-profiles.py" \
+    "$target_root/artifacts/ao486-pll-profiles.log" "$ao486_profiles_tmp"
+cmp "$ao486_profiles_tmp" "$target_root/rtl/de25_ao486_pll_profiles.sv"
+rm -f "$ao486_profiles_tmp"
+
+output=${TMPDIR:-/tmp}/ao486_gus_sdram_tb.vvp
+iverilog -g2012 -Wall -DDE25_AGILEX_PLL \
+    -DDE25_CORE_HAS_SPLIT_SDRAM_DQ \
+    -s ao486_gus_sdram_tb \
+    -o "$output" \
+    "$target_root/upstream/cores/AO486/rtl/soc/gus/sdram.sv" \
+    "$target_root/sim/ao486_gus_sdram_tb.sv"
+vvp "$output"
+
+ao486_latest_patch=$(find "$target_root/patches/AO486" -name '*.patch' \
+    -type f | sort | tail -1)
+git -C "$target_root/upstream/cores/AO486" apply --reverse --check \
+    --ignore-whitespace "$ao486_latest_patch"
+
+echo "PASS: ao486 uses the shared video PLL and timing-checked GUS SDRAM"
 
 grep -q 'gui_number_of_clocks 4' \
     "$target_root/ip/create_menu_core_pll.tcl"
@@ -877,7 +926,17 @@ grep -q 'input         menu_core' \
 grep -q 'osd_buffer\[0:' \
     "$target_root/upstream/cores/Menu/sys/osd.v"
 for qsf in "$target_root"/quartus/DE25_MISTER_*.qsf; do
-    grep -q 'upstream/cores/Menu/sys/osd.v' "$qsf"
+    if [[ $qsf == *_V2.qsf ]]; then
+        base_qsf=${qsf%_V2.qsf}.qsf
+        if [[ -f $base_qsf ]]; then
+            grep -q "^source $(basename "$base_qsf")$" "$qsf"
+        else
+            grep -q '^source de25_simple_persona_base.qsf$' "$qsf"
+        fi
+    else
+        grep -q 'upstream/cores/Menu/sys/osd.v' "$qsf" ||
+            grep -q '^source DE25_MISTER_MENU.qsf$' "$qsf"
+    fi
 done
 grep -q '\.outclk_2(de25_sdram_clk)' "$menu_source"
 grep -q '\.outclk_3(de25_sdram_capture_clk)' "$menu_source"
@@ -895,7 +954,7 @@ echo "PASS: Menu uses independently phase-shifted SDRAM output and capture clock
 
 grep -q 'require_nonnegative_slack output-setup' \
     "$target_root/scripts/report-sdram-timing.tcl"
-grep -q 'require_nonnegative_slack global-setup' \
+grep -q 'Full-design setup and hold are enforced separately' \
     "$target_root/scripts/report-sdram-timing.tcl"
 grep -q 'require_nonnegative_slack input-hold' \
     "$target_root/scripts/report-sdram-timing.tcl"
@@ -1014,15 +1073,43 @@ bash -n "$target_root/scripts/rebuild-platform-release.sh"
 bash -n "$target_root/scripts/fetch-official-core.sh"
 bash -n "$target_root/scripts/official-port-inventory.sh"
 [[ $("$target_root/scripts/list-packaged-artifacts.sh" | wc -l | tr -d ' ') -eq 8 ]]
-[[ $("$target_root/scripts/list-packaged-artifacts.sh" --managed | wc -l | tr -d ' ') -eq 8 ]]
-grep -q $'^PCXT\tbuilt\tscripts/build-pcxt.sh\tartifacts/pcxt/PCXT_20260815.rbf\tpass\tpending$' \
+[[ $("$target_root/scripts/list-packaged-artifacts.sh" --managed | wc -l | tr -d ' ') -eq 18 ]]
+grep -q $'^NES\tpackaged\tscripts/build-nes-v2.sh\tartifacts/nes-v2/NES_v2.rbf\tpass\tpending$' \
     "$target_root/port-status.tsv"
-grep -q $'^_Computer\tIBM PC/XT\tPCXT\tyes\t.*\tbuilt\tscripts/build-pcxt.sh\tartifacts/pcxt/PCXT_20260815.rbf\tpass\tpending\t$' \
+grep -q $'^PC110\tpackaged\tscripts/build-pc110.sh\tartifacts/pc110/IBM_PC110_20260825_FDCD_VERTICAL_ACCUM_FIX.rbf\tpass\tpending$' \
+    "$target_root/port-status.tsv"
+grep -q $'^PCXT\tbuilt\tscripts/build-pcxt-v2.sh\tartifacts/pcxt-v2/PCXT_v2.rbf\tpass\tpending$' \
+    "$target_root/port-status.tsv"
+grep -q $'^_Computer\tIBM PC/XT\tPCXT\tyes\t.*\tbuilt\tscripts/build-pcxt-v2.sh\tartifacts/pcxt-v2/PCXT_v2.rbf\tpass\tpending\t' \
+    "$target_root/build-matrix.tsv"
+grep -q $'^SMS\tbuilt\tscripts/build-sms-v2.sh\tartifacts/sms-v2/SMS_v2.rbf\tpass\tpending$' \
+    "$target_root/port-status.tsv"
+grep -q $'^AO486\tbuilt\tscripts/build-ao486-v2.sh\tartifacts/ao486-v2/AO486_v2.rbf\tpass\tpending$' \
+    "$target_root/port-status.tsv"
+grep -q $'^ATARI7800\tbuilt\tscripts/build-atari7800-v2.sh\tartifacts/atari7800-v2/Atari7800_v2.rbf\tpass\tload-pass$' \
+    "$target_root/port-status.tsv"
+grep -q $'^Jaguar\tbuilt\tscripts/build-jaguar-v2.sh\tartifacts/jaguar-v2/Jaguar_v2.rbf\tpass\tload-pass$' \
+    "$target_root/port-status.tsv"
+grep -q $'^PSX\tbuilt\tscripts/build-psx-v2.sh\tartifacts/psx-v2/PSX_v2_ntsc_bringup.rbf\tpass\tload-pass$' \
+    "$target_root/port-status.tsv"
+grep -q $'^N64\tbuilt\tscripts/build-n64-v2.sh\tartifacts/n64-v2/N64_v2_ntsc_bringup.rbf\tpass\tpending$' \
+    "$target_root/port-status.tsv"
+grep -q $'^Saturn\tbuilt\tscripts/build-saturn-v2.sh\tartifacts/saturn-v2/Saturn_v2_ntsc_light_bringup.rbf\tpass\tpending$' \
+    "$target_root/port-status.tsv"
+grep -q $'^_Console\tSega Master System, Game Gear\tSMS\tyes\t.*\tbuilt\tscripts/build-sms-v2.sh\tartifacts/sms-v2/SMS_v2.rbf\tpass\tpending\t' \
+    "$target_root/build-matrix.tsv"
+grep -q $'^_Computer\tao486 (PC 486)\tAO486\tno\t.*\tbuilt\tscripts/build-ao486-v2.sh\tartifacts/ao486-v2/AO486_v2.rbf\tpass\tpending\t' \
     "$target_root/build-matrix.tsv"
 grep -q 'Refusing mixed HPS I/O hashes in the update bundle' \
     "$target_root/scripts/make-update-bundle.sh"
+grep -q 'MISTER_DE25_MENU_RBF' "$target_root/scripts/make-update-bundle.sh"
+grep -q 'make-runtime-core-catalog.sh" --managed' \
+    "$target_root/scripts/make-update-bundle.sh"
 grep -q 'list-packaged-artifacts.sh' "$target_root/scripts/make-update-bundle.sh"
 grep -q 'list-packaged-artifacts.sh' "$target_root/scripts/prepare-sd-image.sh"
+grep -q 'MISTER_DE25_MENU_RBF' "$target_root/scripts/prepare-sd-image.sh"
+grep -q 'MISTER_DE25_PLATFORM_HASH_FILE' \
+    "$target_root/scripts/prepare-sd-image.sh"
 grep -q 'artifacts/main/MiSTer' "$target_root/scripts/prepare-sd-image.sh"
 grep -q 'artifacts/kernel/Image' "$target_root/scripts/prepare-sd-image.sh"
 grep -q 'artifacts/kernel/stratix10-soc.ko' \
@@ -1056,8 +1143,9 @@ if rg -q 'sdm-remapper' "$target_root/kernel/patches"; then
 fi
 grep -q 'artifacts/main/MiSTer' "$target_root/scripts/make-update-bundle.sh"
 grep -q 'MISTER_DE25_MAIN_OUTPUT' "$target_root/scripts/build-main-aarch64.sh"
-grep -q 'if (is_menu()) spi_osd_cmd(OSD_CMD_WRITE | 8);' \
+grep -q 'if (osd_size > 8) spi_osd_cmd(OSD_CMD_WRITE | 8);' \
     "$target_root/upstream/Main_MiSTer/osd.cpp"
+echo "PASS: Main reasserts 16-row geometry for in-core menus"
 grep -q 'list-packaged-artifacts.sh" --managed' \
     "$target_root/scripts/prepare-sd-image.sh"
 grep -q -- '--registered' "$target_root/scripts/build-catalog.sh"
@@ -1119,9 +1207,13 @@ grep -q '#if defined(__ARM_NEON) && !defined(MISTER_DE25)' \
 grep -A15 'No NEON is available, or this is DE25 framebuffer I/O' \
     "$target_root/upstream/Main_MiSTer/scaler.cpp" | \
     grep -q 'volatile unsigned char \*buffer'
-grep -A8 'The Menu persona always owns a 16-row bitmap' \
+grep -A8 'Menu and fixed-scaled DE25 personas always own a 16-row bitmap' \
     "$target_root/upstream/cores/Menu/sys/osd.v" | \
-    grep -q 'OSD_HEIGHT<<(highres | menu_core)'
+    grep -q 'OSD_HEIGHT<<(highres | menu_core | force_highres)'
+grep -A12 'Fixed-scaled cores expose a full 16-row MiSTer configuration menu' \
+    "$target_root/rtl/de25_mister_menu_top.sv" | \
+    grep -q '\.force_highres(1.b1)'
+echo "PASS: fixed-scaled cores retain every in-core OSD row"
 grep -q 'scaler_rambase = 32.h2000_0000' \
     "$target_root/rtl/de25_mister_menu_top.sv"
 grep -A5 'DE25_AO486_CORE' \
@@ -1236,10 +1328,10 @@ if grep -q 'subsys_debug.fpga_m_master subsys_hps.fpga2hps' \
 fi
 grep -q 'separate coherent hps_m master' \
     "$target_root/ip/create_mister_hps.tcl"
-if grep -B1 'add_instance mister_h2f_reset_fanout' \
+if ! grep -B1 'add_instance mister_h2f_reset_fanout' \
     "$target_root/ip/create_mister_hps.tcl" | \
     grep -q 'if {!\$legacy_no_vbuf}'; then
-    echo "The HPS bridge reset fanout must be present in legacy-no-vbuf PC110 builds" >&2
+    echo "The 078-compatible HPS build must retain the original bridge-reset boundary" >&2
     exit 1
 fi
 if grep -q 'set legacy_no_vbuf 1' \

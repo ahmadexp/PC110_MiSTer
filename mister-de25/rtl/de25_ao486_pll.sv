@@ -13,6 +13,7 @@ module de25_ao486_pll (
     input  logic [2:0] speed,
     input  logic       uart_slow,
     output logic       clk_sys,
+    output logic       clk_sdram_physical,
     output logic       clk_uart1,
     output logic       clk_uart2,
     output logic       clk_mpu,
@@ -51,11 +52,13 @@ module de25_ao486_pll (
 
     logic [31:0] m_settings;
     logic [31:0] c0_settings;
+    logic [31:0] c1_settings;
     logic [14:0] charge_pump_settings;
     de25_ao486_pll_profiles profiles (
         .speed(bounded_speed),
         .m_settings,
         .c0_settings,
+        .c1_settings,
         .charge_pump_settings
     );
 
@@ -79,13 +82,13 @@ module de25_ao486_pll (
     logic axil_rvalid;
     logic axil_rready;
 
-    de25_iopll_reconfig_axil #(.C_COUNTERS(1)) reconfigure (
+    de25_iopll_reconfig_axil #(.C_COUNTERS(2)) reconfigure (
         .clk(refclk),
         .reset(control_reset),
         .start(profile_start),
         .m_settings,
         .c0_settings,
-        .c1_settings(32'd0),
+        .c1_settings,
         .c2_settings(32'd0),
         .c3_settings(32'd0),
         .c4_settings(32'd0),
@@ -123,6 +126,7 @@ module de25_ao486_pll (
         .cpu_reset_reset(pll_por[7]),
         .cpu_locked_export(cpu_locked),
         .cpu_outclk_clk(clk_sys),
+        .cpu_sdram_outclk_clk(clk_sdram_physical),
         .s0_axil_clk_clk(refclk),
         .s0_axil_rst_n_reset_n(~control_reset),
         .s0_axil_awaddr(axil_awaddr),

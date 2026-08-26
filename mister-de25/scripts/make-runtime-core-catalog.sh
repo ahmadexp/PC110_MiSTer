@@ -2,11 +2,16 @@
 set -euo pipefail
 
 platform_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+mode=packaged
+if [[ ${1:-} == --managed ]]; then
+    mode=managed
+    shift
+fi
 output=${1:-}
 matrix=${2:-$platform_root/build-matrix.tsv}
 
 if [[ -z $output ]]; then
-    echo "Usage: make-runtime-core-catalog.sh OUTPUT.tsv [BUILD_MATRIX.tsv]" >&2
+    echo "Usage: make-runtime-core-catalog.sh [--managed] OUTPUT.tsv [BUILD_MATRIX.tsv]" >&2
     exit 2
 fi
 if [[ ! -s $matrix ]]; then
@@ -20,10 +25,10 @@ temporary=$output.tmp.$$
 trap 'rm -f -- "$temporary"' EXIT
 
 printf '# id\trbf\nMENU\tmenu.rbf\n' >"$temporary"
-awk -F '\t' '
+awk -F '\t' -v mode="$mode" '
     BEGIN { seen_id["MENU"] = 1 }
     NR == 1 { next }
-    $8 == "packaged" {
+    $8 == "packaged" || (mode == "managed" && $10 != "") {
         id = $3
         if (id !~ /^[A-Za-z0-9_.-]+$/) {
             print "Unsafe or missing runtime core ID for " $2 > "/dev/stderr"

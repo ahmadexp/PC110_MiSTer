@@ -5,22 +5,24 @@ module de25_ao486_pll_profiles (
     input  logic [2:0] speed,
     output logic [31:0] m_settings,
     output logic [31:0] c0_settings,
+    output logic [31:0] c1_settings,
     output logic [14:0] charge_pump_settings
 );
-    logic [78:0] profile;
+    logic [110:0] profile;
     logic [2:0] bounded_speed;
 
     assign bounded_speed = speed > 3'd4 ? 3'd4 : speed;
     always_comb begin
         case (bounded_speed)
-            3'd0: profile = {32'h03F00100, 32'h88800812, 15'h00C9};
-            3'd1: profile = {32'h13E20403, 32'h3500086A, 15'h0042};
-            3'd2: profile = {32'h13E20403, 32'h1A800835, 15'h0042};
-            3'd3: profile = {32'h03F00100, 32'h0E00081C, 15'h00C9};
-            3'd4: profile = {32'h04000100, 32'h08000810, 15'h00C9};
+        3'd0: profile = {32'h02D00100, 32'h8600080D, 32'h8600480D, 15'h00C9};
+        3'd1: profile = {32'h03C00100, 32'h32000864, 32'h3202F864, 15'h00C9};
+        3'd2: profile = {32'h03C00100, 32'h19000832, 32'h19016832, 15'h00C9};
+        3'd3: profile = {32'h0E100402, 32'h0C800819, 32'h0C98A019, 15'h0042};
+        3'd4: profile = {32'h03C00100, 32'h0780080F, 32'h0780500F, 15'h00C9};
             default: profile = '0;
         endcase
     end
 
-    assign {m_settings, c0_settings, charge_pump_settings} = profile;
+    assign {m_settings, c0_settings, c1_settings,
+            charge_pump_settings} = profile;
 endmodule

@@ -12,6 +12,12 @@ load_system $output_system
 if {![info exists legacy_no_vbuf]} {
     set legacy_no_vbuf 0
 }
+if {[info exists ::env(DE25_HPS_COMPAT_078)]} {
+    set hps_compat_078 $::env(DE25_HPS_COMPAT_078)
+    if {$hps_compat_078 eq "1"} {
+        set legacy_no_vbuf 1
+    }
+}
 
 # The imported GHRD stores its clock bridge as a generic component. Newer
 # platforms recreate it as editable native IP. The 078A boot platform was
@@ -48,26 +54,28 @@ if {!$legacy_no_vbuf} {
 # active-high fanout input beside it, and have the shell loop the HPS reset
 # output back into that input.  A reset bridge supplies the legal one-to-many
 # Platform Designer connection to the four bridge-facing reset ports.
-add_instance mister_h2f_reset_fanout altera_reset_bridge 19.2.0
-set_instance_parameter_value mister_h2f_reset_fanout ACTIVE_LOW_RESET 0
-set_instance_parameter_value mister_h2f_reset_fanout SYNCHRONOUS_EDGES none
-set_instance_parameter_value mister_h2f_reset_fanout NUM_RESET_OUTPUTS 1
-set_instance_parameter_value mister_h2f_reset_fanout USE_RESET_REQUEST 0
-set_instance_parameter_value mister_h2f_reset_fanout SYNC_RESET 0
+if {!$legacy_no_vbuf} {
+    add_instance mister_h2f_reset_fanout altera_reset_bridge 19.2.0
+    set_instance_parameter_value mister_h2f_reset_fanout ACTIVE_LOW_RESET 0
+    set_instance_parameter_value mister_h2f_reset_fanout SYNCHRONOUS_EDGES none
+    set_instance_parameter_value mister_h2f_reset_fanout NUM_RESET_OUTPUTS 1
+    set_instance_parameter_value mister_h2f_reset_fanout USE_RESET_REQUEST 0
+    set_instance_parameter_value mister_h2f_reset_fanout SYNC_RESET 0
 
-add_interface mister_h2f_bridge_reset reset sink
-set_interface_property mister_h2f_bridge_reset \
-    EXPORT_OF mister_h2f_reset_fanout.in_reset
+    add_interface mister_h2f_bridge_reset reset sink
+    set_interface_property mister_h2f_bridge_reset \
+        EXPORT_OF mister_h2f_reset_fanout.in_reset
 
-foreach bridge_reset {
-    f2sdram_rst
-    fpga2hps_rst
-    hps2fpga_rst
-    lwhps2fpga_rst
-} {
-    remove_connection rst_in.out_reset/subsys_hps.$bridge_reset
-    add_connection mister_h2f_reset_fanout.out_reset \
-        subsys_hps.$bridge_reset
+    foreach bridge_reset {
+        f2sdram_rst
+        fpga2hps_rst
+        hps2fpga_rst
+        lwhps2fpga_rst
+    } {
+        remove_connection rst_in.out_reset/subsys_hps.$bridge_reset
+        add_connection mister_h2f_reset_fanout.out_reset \
+            subsys_hps.$bridge_reset
+    }
 }
 
 # The reference design's 256 KiB fabric OCM is debug scratch memory. Removing

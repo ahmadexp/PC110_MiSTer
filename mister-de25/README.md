@@ -169,12 +169,16 @@ synthesis, fitting, assembly, and timing as explicit stages. This prevents the
 monolithic Quartus flow from regenerating the HPS IP a second time and changing
 the platform hash.
 
-Menu, PC110, PCXT, InputTest, MemTest, NES, SNES, Minimig, TurboGrafx16,
-Apple-I, and SMS have completed Agilex 5 synthesis, fitting, assembly, timing
-analysis, and generation of runtime images matching the board's HPS I/O
-platform. The build matrix marks eight cores as packaged. PCXT and SMS are
-registered as built and timing-clean but remain hardware-pending until
-gameplay is validated.
+Menu, PC110, PCXT, ao486, InputTest, MemTest, NES, SNES, Minimig,
+TurboGrafx16, Apple-I, and SMS have completed Agilex 5 synthesis, fitting,
+assembly, timing analysis, and generation of runtime images matching the
+board's HPS I/O platform. The build matrix marks eight cores as packaged.
+PCXT, SMS/Game Gear, and ao486 are registered as Platform V2 builds with zero
+timing violations, but remain hardware-pending until gameplay is validated.
+ao486's main DDR-backed PC memory path and its separate GUS native-SDRAM path
+are both present. The GUS interface uses a related phase-shifted physical
+clock, frequency-aware refresh scheduling, and timing-checked bidirectional
+data I/O; real GUS playback remains hardware-pending.
 The ARM64 Main executable, runtime FPGA-region
 loader, bridge lifecycle helper, boot services, and final SD image build are
 reproducible. The image is `artifacts/mister-de25.img`, with Menu preloaded at
@@ -236,16 +240,20 @@ that already pass those checks, and publishes a manifest only after the whole
 requested set succeeds.
 
 `scripts/make-update-bundle.sh` creates a SHA-256 and size-verified update
-bundle containing Main, Menu, every core marked `packaged` in the locked build
-matrix, the FPGA-region loader, and boot services. The SD image builder reads
-the same matrix, so newly validated ports do not require a second hardcoded
-release list. Run `Scripts/update_de25.sh` from the image with either a local
-bundle directory or an HTTPS bundle URL. The updater stages every payload
-before installation, retains `.previous` copies, and rolls back files already
-switched if a later install step fails. RBF sidecars are mandatory and every
-runtime hash must match the installed QSPI platform hash. SD image creation
-enforces the same invariant before copying anything and reads every RBF and
-sidecar back from the resulting FAT filesystem.
+bundle containing Main, Menu, every core with a registered build artifact in
+the locked matrix, the FPGA-region loader, and boot services. The generated
+runtime catalog includes the same managed set, including timing-clean ports
+that still await hardware validation. `MISTER_DE25_MENU_RBF` and
+`MISTER_DE25_PLATFORM_HASH_FILE` select a matched alternate platform such as
+Menu-v2. The SD image builder reads the same matrix, so newly validated ports
+do not require a second hardcoded release list. Run `Scripts/update_de25.sh`
+from the image with either a local bundle directory or an HTTPS bundle URL.
+The updater stages every payload before installation, retains `.previous`
+copies, and rolls back files already switched if a later install step fails.
+RBF sidecars are mandatory and every runtime hash must match the installed
+QSPI platform hash. SD image creation enforces the same invariant before
+copying anything and reads every RBF and sidecar back from the resulting FAT
+filesystem.
 
 For real-board validation before installation,
 `sw/mister-de25-test-rbf CANDIDATE.rbf ROLLBACK.rbf [CONTENT.mgl]` stops Main,

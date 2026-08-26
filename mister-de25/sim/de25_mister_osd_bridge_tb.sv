@@ -51,7 +51,8 @@ module de25_mister_osd_bridge_tb;
 
     osd compositor (
         .clk_sys(clk_sys),
-        .menu_core(1'b1),
+        .menu_core(1'b0),
+        .force_highres(1'b1),
         .io_osd(io_osd),
         .io_strobe(io_strobe),
         .io_din(io_din),
@@ -98,7 +99,7 @@ module de25_mister_osd_bridge_tb;
         check_condition(hps_gp_in[27], "Main-visible hardware OSD status asserted");
 
         check_condition(compositor.osd_h == 22'd128,
-                        "Menu OSD starts at its full sixteen-line height");
+                        "scaled-core OSD starts at its full sixteen-line height");
 
         // Main selects the 16-line OSD by writing line 8 (command 0x28).
         // The Settings page photographed on hardware exposed only its first
@@ -106,13 +107,13 @@ module de25_mister_osd_bridge_tb;
         osd_command(8'h28);
         repeat (2) @(posedge clk_sys);
         check_condition(compositor.osd_h == 22'd128,
-                        "Menu OSD expanded to sixteen lines");
+                        "scaled-core OSD remains sixteen lines after line 8");
 
         osd_command(8'h40);
         check_condition(!osd_status, "OSD compositor accepted disable command");
         check_condition(!hps_gp_in[27], "Main-visible hardware OSD status cleared");
         check_condition(compositor.osd_h == 22'd128,
-                        "Menu OSD preserves sixteen-line height while disabled");
+                        "scaled-core OSD preserves sixteen-line height while disabled");
 
         $display("PASS: DE25 Main-to-OSD bridge enable and status feedback");
         $finish;

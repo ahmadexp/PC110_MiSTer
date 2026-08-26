@@ -56,10 +56,9 @@ report_timing -setup -from $de25_sdram_dq -to $de25_registers -npaths 100 \
 report_timing -hold -from $de25_sdram_dq -to $de25_registers -npaths 100 \
     -detail full_path -file ${project}.sdram-input-hold.rpt
 
-require_nonnegative_slack global-setup \
-    [get_timing_paths -setup -npaths 1]
-require_nonnegative_slack global-hold \
-    [get_timing_paths -hold -npaths 1]
+# Full-design setup and hold are enforced separately from the standard
+# TimeQuest summary. Keep this audit scoped to paths that actually terminate
+# at or originate from the external SDRAM interface.
 require_nonnegative_slack output-setup \
     [get_timing_paths -setup -to $de25_sdram_outputs -npaths 100]
 require_nonnegative_slack output-hold \

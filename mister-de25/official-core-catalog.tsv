@@ -1,11 +1,11 @@
 category	name	home	sdram	repository	branch	source_id	comments
 _Arcade	Act-Fancer: Cybernetick Hyper Weapon		yes	https://github.com/MiSTer-devel/Arcade-ActFancer_MISTer.git		MiSTer-devel_Arcade-ActFancer_MISTer	
+_Arcade	Arabian		no	https://github.com/MiSTer-devel/Arcade-Arabian_MiSTer.git		MiSTer-devel_Arcade-Arabian_MiSTer	
 _Arcade	Arkanoid		no	https://github.com/MiSTer-devel/Arcade-Arkanoid_MISTer.git		MiSTer-devel_Arcade-Arkanoid_MISTer	
-_Arcade	Asteroids		yes	https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer.git		MiSTer-devel_Arcade-Asteroids_MiSTer	
 _Arcade	Asteroids Deluxe		yes	https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer.git		MiSTer-devel_Arcade-Asteroids_MiSTer	
-_Arcade	Lunar Lander		yes	https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer.git		MiSTer-devel_Arcade-Asteroids_MiSTer	
 _Arcade	Bally&nbsp;Midway&nbsp;Astrocade&nbsp;/&nbsp;Bally&nbsp;Midway&nbsp;Arcade		no	https://github.com/MiSTer-devel/Arcade-Astrocade_MiSTer.git		MiSTer-devel_Arcade-Astrocade_MiSTer	
 _Arcade	Atari System-1		yes	https://github.com/MiSTer-devel/Arcade-Atari-system1_MiSTer.git		MiSTer-devel_Arcade-Atari-system1_MiSTer	
+_Arcade	Atari System-2		yes	https://github.com/MiSTer-devel/Arcade-AtariSystem2_MiSTer.git		MiSTer-devel_Arcade-AtariSystem2_MiSTer	
 _Arcade	Atari Tetris		no	https://github.com/MiSTer-devel/Arcade-ATetris_MiSTer.git		MiSTer-devel_Arcade-ATetris_MiSTer	
 _Arcade	Athena		no	https://github.com/MiSTer-devel/Arcade-Athena_MiSTer.git		MiSTer-devel_Arcade-Athena_MiSTer	
 _Arcade	Bagman / Le Bagnard		no	https://github.com/MiSTer-devel/Arcade-Bagman_MiSTer.git		MiSTer-devel_Arcade-Bagman_MiSTer	
@@ -29,6 +29,7 @@ _Arcade	Cave		yes	https://github.com/MiSTer-devel/Arcade-Cave_MiSTer.git		MiSTer
 _Arcade	Cave (Banpresto)		yes	https://github.com/MiSTer-devel/Arcade-CaveBanpresto_MiSTer.git		MiSTer-devel_Arcade-CaveBanpresto_MiSTer	
 _Arcade	Centipede		no	https://github.com/MiSTer-devel/Arcade-Centipede_MiSTer.git		MiSTer-devel_Arcade-Centipede_MiSTer	
 _Arcade	Chameleon		no	https://github.com/MiSTer-devel/Arcade-Chameleon_MiSTer.git		MiSTer-devel_Arcade-Chameleon_MiSTer	
+_Arcade	Champion Base Ball		no	https://github.com/MiSTer-devel/Arcade-ChampionBaseball_MiSTer.git		MiSTer-devel_Arcade-ChampionBaseball_MiSTer	
 _Arcade	China Gate		yes	https://github.com/MiSTer-devel/Arcade-ChinaGate_MiSTer.git		MiSTer-devel_Arcade-ChinaGate_MiSTer	
 _Arcade	City Connection		no	https://github.com/MiSTer-devel/Arcade-CityConnection_MiSTer.git		MiSTer-devel_Arcade-CityConnection_MiSTer	
 _Arcade	Computer Space		no	https://github.com/MiSTer-devel/Arcade-ComputerSpace_MiSTer.git		MiSTer-devel_Arcade-ComputerSpace_MiSTer	
@@ -46,6 +47,7 @@ _Arcade	D-Con		yes	https://github.com/MiSTer-devel/Arcade-Dcon_MiSTer.git		MiSTe
 _Arcade	Deco16		yes	https://github.com/MiSTer-devel/Arcade-Deco16_Mister.git		MiSTer-devel_Arcade-Deco16_Mister	
 _Arcade	Deco Cassette System		yes	https://github.com/MiSTer-devel/Arcade-DECOCassette_MiSTer.git		MiSTer-devel_Arcade-DECOCassette_MiSTer	
 _Arcade	Defender		no	https://github.com/MiSTer-devel/Arcade-Defender_MiSTer.git		MiSTer-devel_Arcade-Defender_MiSTer	
+_Arcade	Denjin Makai		yes	https://github.com/MiSTer-devel/Arcade-DenjinMakai_MiSTer.git		MiSTer-devel_Arcade-DenjinMakai_MiSTer	
 _Arcade	Dig Dug		no	https://github.com/MiSTer-devel/Arcade-DigDug_MiSTer.git		MiSTer-devel_Arcade-DigDug_MiSTer	
 _Arcade	Dominos		no	https://github.com/MiSTer-devel/Arcade-Dominos_MiSTer.git		MiSTer-devel_Arcade-Dominos_MiSTer	
 _Arcade	Donkey Kong 3		no	https://github.com/MiSTer-devel/Arcade-DonkeyKong3_MiSTer.git		MiSTer-devel_Arcade-DonkeyKong3_MiSTer	
@@ -85,8 +87,10 @@ _Arcade	Joust 2: Survival of the Fittest		no	https://github.com/MiSTer-devel/Arc
 _Arcade	Juno First		no	https://github.com/MiSTer-devel/Arcade-JunoFirst_MiSTer.git		MiSTer-devel_Arcade-JunoFirst_MiSTer	
 _Arcade	Kangaroo		no	https://github.com/MiSTer-devel/Arcade-Kangaroo_MiSTer.git		MiSTer-devel_Arcade-Kangaroo_MiSTer	
 _Arcade	Kick And Run		no	https://github.com/MiSTer-devel/Arcade-KickAndRun_MiSTer.git		MiSTer-devel_Arcade-KickAndRun_MiSTer	
+_Arcade	Klax		no	https://github.com/MiSTer-devel/Arcade-Klax_MiSTer.git		MiSTer-devel_Arcade-Klax_MiSTer	
 _Arcade	Kyugo System		no	https://github.com/MiSTer-devel/Arcade-Kyugo_MiSTer.git		MiSTer-devel_Arcade-Kyugo_MiSTer	
 _Arcade	Lady Bug		no	https://github.com/MiSTer-devel/Arcade-LadyBug_MiSTer.git		MiSTer-devel_Arcade-LadyBug_MiSTer	
+_Arcade	Laserdisc Games		yes	https://github.com/MiSTer-devel/Arcade-LaserdiscGames_MiSTer.git		MiSTer-devel_Arcade-LaserdiscGames_MiSTer	
 _Arcade	Legionnaire		yes	https://github.com/MiSTer-devel/Arcade-Legionnaire_MiSTer.git		MiSTer-devel_Arcade-Legionnaire_MiSTer	
 _Arcade	Major Havoc		yes	https://github.com/MiSTer-devel/Arcade-MajorHavoc_MiSTer.git		MiSTer-devel_Arcade-MajorHavoc_MiSTer	
 _Arcade	Mario Bros		no	https://github.com/MiSTer-devel/Arcade-MarioBros_MiSTer.git		MiSTer-devel_Arcade-MarioBros_MiSTer	
@@ -113,6 +117,7 @@ _Arcade	PolyPlay		no	https://github.com/MiSTer-devel/Arcade-PolyPlay_MiSTer.git	
 _Arcade	Pong		no	https://github.com/MiSTer-devel/Arcade-Pong_MiSTer.git		MiSTer-devel_Arcade-Pong_MiSTer	
 _Arcade	Pooyan		no	https://github.com/MiSTer-devel/Arcade-Pooyan_MiSTer.git		MiSTer-devel_Arcade-Pooyan_MiSTer	
 _Arcade	Popeye		no	https://github.com/MiSTer-devel/Arcade-Popeye_MiSTer.git		MiSTer-devel_Arcade-Popeye_MiSTer	
+_Arcade	PsikyoSH2		yes	https://github.com/MiSTer-devel/Arcade-PsikyoSH2_MiSTer.git		MiSTer-devel_Arcade-PsikyoSH2_MiSTer	
 _Arcade	Psychic 5		no	https://github.com/MiSTer-devel/Arcade-Psychic5_MiSTer.git		MiSTer-devel_Arcade-Psychic5_MiSTer	
 _Arcade	QBert		no	https://github.com/MiSTer-devel/Arcade-QBert_MiSTer.git		MiSTer-devel_Arcade-QBert_MiSTer	
 _Arcade	Qix		no	https://github.com/MiSTer-devel/Arcade-Qix_MiSTer.git		MiSTer-devel_Arcade-Qix_MiSTer	
@@ -125,6 +130,7 @@ _Arcade	Salamander		no	https://github.com/MiSTer-devel/Arcade-Salamander_MiSTer.
 _Arcade	Scooter Shooter		no	https://github.com/MiSTer-devel/Arcade-ScooterShooter_MiSTer.git		MiSTer-devel_Arcade-ScooterShooter_MiSTer	
 _Arcade	Scramble		yes	https://github.com/MiSTer-devel/Arcade-Scramble_MiSTer.git		MiSTer-devel_Arcade-Scramble_MiSTer	
 _Arcade	SD Gundam Sangokushi Rainbow Tairiku Senki		yes	https://github.com/MiSTer-devel/Arcade-SDGundamRainbow_MiSTer.git		MiSTer-devel_Arcade-SDGundamRainbow_MiSTer	
+_Arcade	Sega G80V		yes	https://github.com/MiSTer-devel/Arcade-SegaG80V_MiSTer.git		MiSTer-devel_Arcade-SegaG80V_MiSTer	
 _Arcade	Sega System 1		no	https://github.com/MiSTer-devel/Arcade-SEGASYS1_MiSTer.git		MiSTer-devel_Arcade-SEGASYS1_MiSTer	
 _Arcade	Sega/Gremlin VIC Z80 Arcade hardware		yes	https://github.com/MiSTer-devel/Arcade-SegaVICZ80_MiSTer.git		MiSTer-devel_Arcade-SegaVICZ80_MiSTer	
 _Arcade	Silver Land		no	https://github.com/MiSTer-devel/Arcade-SilverLand_MiSTer.git		MiSTer-devel_Arcade-SilverLand_MiSTer	
@@ -152,6 +158,7 @@ _Arcade	TIA-MC1		no	https://github.com/MiSTer-devel/Arcade-TIAMC1_MiSTer.git		Mi
 _Arcade	Time Pilot '84		no	https://github.com/MiSTer-devel/Arcade-TimePilot84_MISTer.git		MiSTer-devel_Arcade-TimePilot84_MISTer	
 _Arcade	Time Pilot		no	https://github.com/MiSTer-devel/Arcade-TimePilot_MiSTer.git		MiSTer-devel_Arcade-TimePilot_MiSTer	
 _Arcade	T.N.K. III		no	https://github.com/MiSTer-devel/Arcade-TNKIII_MiSTer.git		MiSTer-devel_Arcade-TNKIII_MiSTer	
+_Arcade	Toobin'		yes	https://github.com/MiSTer-devel/Arcade-Toobin_MiSTer.git		MiSTer-devel_Arcade-Toobin_MiSTer	
 _Arcade	Traverse USA		no	https://github.com/MiSTer-devel/Arcade-TraverseUSA_MiSTer.git		MiSTer-devel_Arcade-TraverseUSA_MiSTer	
 _Arcade	Trio The Punch — Never Forget Me…		yes	https://github.com/MiSTer-devel/Arcade-TrioThePunch_MiSTer.git		MiSTer-devel_Arcade-TrioThePunch_MiSTer	
 _Arcade	Tropical Angel / New Tropical Angel		yes	https://github.com/MiSTer-devel/Arcade-TropicalAngel_MiSTer.git		MiSTer-devel_Arcade-TropicalAngel_MiSTer	
@@ -271,6 +278,7 @@ _Console	Nichibutsu My Vision	MyVision	no	https://github.com/MiSTer-devel/MyVisi
 _Console	Nintendo 64	N64	yes	https://github.com/MiSTer-devel/N64_MiSTer.git		MiSTer-devel_N64_MiSTer	
 _Console	Neo Geo MVS/AES	NEOGEO	yes	https://github.com/MiSTer-devel/NeoGeo_MiSTer.git		MiSTer-devel_NeoGeo_MiSTer	
 _Console	Nintendo Entertainment System (NES)	NES	yes	https://github.com/MiSTer-devel/NES_MiSTer.git		MiSTer-devel_NES_MiSTer	
+_Console	Neo Geo Pocket Color	NGPC	yes	https://github.com/MiSTer-devel/NGPC_MiSTer.git		MiSTer-devel_NGPC_MiSTer	
 _Console	Magnavox Odyssey²	ODYSSEY2	no	https://github.com/MiSTer-devel/Odyssey2_MiSTer.git		MiSTer-devel_Odyssey2_MiSTer	
 _Console	Pokémon Mini	PokemonMini	yes	https://github.com/MiSTer-devel/PokemonMini_MiSTer.git		MiSTer-devel_PokemonMini_MiSTer	
 _Console	PlayStation (PSX)	PSX	yes	https://github.com/MiSTer-devel/PSX_MiSTer.git		MiSTer-devel_PSX_MiSTer	
