@@ -129,6 +129,13 @@ grep -q 'quartus_sh --clean -c "$project" "$project"' \
     "$target_root/scripts/build-pc110.sh"
 grep -q 'DE25_EXPECTED_HPS_IO_HASH_FILE' \
     "$target_root/scripts/build-pc110.sh"
+grep -q 'artifacts/menu-v2/de25_mister_hps_fdcd_synth.qdb' \
+    "$target_root/scripts/build-pc110-v2.sh"
+grep -q 'platforms/fdcd.hps-io-hash' \
+    "$target_root/scripts/build-pc110-v2.sh"
+grep -q 'exec .*build-pc110.sh' \
+    "$target_root/scripts/build-pc110-v2.sh"
+bash -n "$target_root/scripts/build-pc110-v2.sh"
 # HPS/JTAG Qsys order is part of the signed HPS platform input. Match the
 # proven PC110 ordering in Menu.
 menu_qsf=$target_root/quartus/DE25_MISTER_MENU.qsf
@@ -568,6 +575,9 @@ grep -q 'pc110_refresh_div == 9.d451' \
 grep -q 'pc110_refresh_toggle, pit_readdata\[3:0\]' \
     "$target_root/../rtl/system.v"
 echo "PASS: PC110 preserves its scaler within the Agilex M20K budget"
+make -C "$target_root/../sim/iverilog/rtc" clean all
+make -C "$target_root/../sim/iverilog/rtc" clean
+echo "PASS: PC110 RTC advances once per second with a bounded UIP window"
 grep -q 'o_vacc_ini.*4\*OHRESH.*MOD (4\*OHRESH)' \
     "$target_root/../sys/ascal.vhd"
 grep -q 'dif_v.*8\*OHRESH.*MOD (8\*OHRESH)' \
@@ -1084,7 +1094,7 @@ bash -n "$target_root/scripts/official-port-inventory.sh"
 [[ $("$target_root/scripts/list-packaged-artifacts.sh" --managed | wc -l | tr -d ' ') -eq 18 ]]
 grep -q $'^NES\tpackaged\tscripts/build-nes-v2.sh\tartifacts/nes-v2/NES_v2.rbf\tpass\tpending$' \
     "$target_root/port-status.tsv"
-grep -q $'^PC110\tpackaged\tscripts/build-pc110.sh\tartifacts/pc110/IBM_PC110_20260825_FDCD_VERTICAL_ACCUM_FIX.rbf\tpass\tpending$' \
+grep -q $'^PC110\tpackaged\tscripts/build-pc110-v2.sh\tartifacts/pc110/IBM_PC110_20260828_RTC_UIP_FIX_FDCD.rbf\tpass\tpass$' \
     "$target_root/port-status.tsv"
 grep -q $'^PCXT\tbuilt\tscripts/build-pcxt-v2.sh\tartifacts/pcxt-v2/PCXT_v2.rbf\tpass\tpending$' \
     "$target_root/port-status.tsv"

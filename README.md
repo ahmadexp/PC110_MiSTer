@@ -105,14 +105,14 @@ Run the source-level test suites with:
 Build the Menu and PC110 images with:
 
     mister-de25/scripts/build-menu.sh
-    mister-de25/scripts/build-pc110.sh
+    mister-de25/scripts/build-pc110-v2.sh
 
 The hardware-confirmed PC110 image is
-[`DE25_IBM_PC110_20260823_VERTICAL_ACCUM_FIX.rbf`](releases/DE25_IBM_PC110_20260823_VERTICAL_ACCUM_FIX.rbf).
+[`DE25_IBM_PC110_20260828_RTC_UIP_FIX_FDCD.rbf`](releases/DE25_IBM_PC110_20260828_RTC_UIP_FIX_FDCD.rbf).
 Its `.sha256` and `.hps-io-hash` sidecars are required by the guarded DE25
-runtime loader. The build fixes the 1024-profile scaler's vertical accumulator
-so the complete 480-line frame is read and displayed. IBM firmware and disk
-images are not included.
+runtime loader. This release includes the 1024-profile scaler correction and
+the Agilex RTC fix needed for IBM POST to accept the clock and continue into
+PersonaWare. IBM firmware and disk images are not included.
 
 ## Installing
 

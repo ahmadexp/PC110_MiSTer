@@ -372,6 +372,69 @@ module de25_mister_top (
     logic [5:0] pc110_execution_diagnostic;
     logic [5:0] pc110_ddr_diagnostic = 6'd0;
     logic [5:0] pc110_clock_diagnostic;
+    logic [5:0] pc110_rtc_diagnostic;
+    logic       pc110_rtc_ce_toggle = 1'b0;
+    logic       pc110_rtc_second_toggle = 1'b0;
+
+    // Slow RTC events are converted to toggles so the HPS can observe them
+    // reliably through the much faster GP bridge. GPO bit 21 selects these
+    // pages while Main is stopped, and bits 2:0 choose the page.
+    always_ff @(posedge pc110_clk_sys) begin
+        if(fabric_reset_request) begin
+            pc110_rtc_ce_toggle <= 1'b0;
+            pc110_rtc_second_toggle <= 1'b0;
+        end
+        else begin
+            if(core.system.rtc.ce_800hz)
+                pc110_rtc_ce_toggle <= ~pc110_rtc_ce_toggle;
+            if(core.system.rtc.rtc_second_update)
+                pc110_rtc_second_toggle <= ~pc110_rtc_second_toggle;
+        end
+    end
+
+    always_comb begin
+        case(gp_out_sync[2:0])
+            3'd0: pc110_rtc_diagnostic =
+                core.system.rtc.rtc_second[5:0];
+            3'd1: pc110_rtc_diagnostic = {
+                pc110_rtc_second_toggle,
+                pc110_rtc_ce_toggle,
+                core.system.rtc.rtc_second[7:6],
+                core.system.rtc.rtc_minute[1:0]
+            };
+            3'd2: pc110_rtc_diagnostic = {
+                core.system.rtc.sec_state,
+                core.system.rtc.crb_freeze,
+                core.system.rtc.divider[2:1]
+            };
+            3'd3: pc110_rtc_diagnostic =
+                core.system.rtc.sec_timeout[5:0];
+            3'd4: pc110_rtc_diagnostic = {
+                core.system.rtc.rtc_second_update,
+                core.system.rtc.sec_timeout[10:6]
+            };
+            3'd5: pc110_rtc_diagnostic = {
+                core.system.rtc.crb_freeze,
+                core.system.rtc.crb_int_periodic_ena,
+                core.system.rtc.crb_int_alarm_ena,
+                core.system.rtc.crb_int_update_ena,
+                core.system.rtc.crb_binarymode,
+                core.system.rtc.crb_24hour
+            };
+            3'd6: pc110_rtc_diagnostic = {
+                core.system.rtc.divider,
+                core.system.rtc.periodic_rate[2:0]
+            };
+            default: pc110_rtc_diagnostic = {
+                core.system.rtc.irq,
+                core.system.rtc.update_interrupt,
+                core.system.rtc.ce_800hz,
+                core.system.rtc.rtc_second_update,
+                pc110_rtc_ce_toggle,
+                pc110_rtc_second_toggle
+            };
+        endcase
+    end
 
     always_comb begin
         case (gp_out_sync[2:0])
@@ -413,7 +476,9 @@ module de25_mister_top (
         pc110_scaler_selected_response = pc110_scaler_first_response0;
         pc110_scaler_address_diagnostic_word =
             {4'd0, pc110_scaler_first_read_address};
-        if (gp_out_sync[23] && !gp_out_sync[24]) begin
+        if (gp_out_sync[21] && !gp_out_sync[24]) begin
+            pc110_execution_diagnostic = pc110_rtc_diagnostic;
+        end else if (gp_out_sync[23] && !gp_out_sync[24]) begin
             pc110_execution_diagnostic = pc110_clock_diagnostic;
         end else if (gp_out_sync[24]) begin
             if (gp_out_sync[25]) begin

@@ -220,6 +220,26 @@ Hardware evidence:
 - a PID change after `/dev/MiSTer_cmd` `load_core` is expected: current Main
   deliberately restarts itself after loading any RBF via `app_restart()`
 
+## DE25-Nano RTC and PersonaWare milestone (2026-08-28)
+
+The DE25-Nano port now passes IBM POST and boots the existing PersonaWare VHD
+to its desktop. The former stop at `ERROR 00163` was isolated to the RTC path.
+The RTC now uses explicit module-level fractional accumulators with a defined
+reset phase, generates exactly 800 clock-enable events per second, and keeps
+the update-in-progress interval to four 800 Hz events. CMOS alarm register
+`03h` also returns the minute alarm rather than the second alarm.
+
+Hardware diagnostics read the live RTC through the HPS GP bridge while Main
+was paused. Seconds advanced from `00h` to `01h`, register B freeze was clear,
+and register A reported divider `010b`. A fresh launch through the normal
+`IBM_PC110_Personaware.mgl` entry reached the PersonaWare desktop twice in less
+than 30 seconds. The promoted FDCD-compatible artifact has SHA-256
+`e97095865695b0561bc0a9756e335ef64023979677acf82af4f79a77ebdccf74`.
+
+Use `mister-de25/scripts/build-pc110-v2.sh` for standalone DE25 builds. It
+reuses the verified FDCD HPS partition and rejects the retired 078A platform
+layout before producing a deployable runtime RBF.
+
 Known follow-ups:
 
 - the trackpad is not yet relayed to the HPS mouse (the serial relay held

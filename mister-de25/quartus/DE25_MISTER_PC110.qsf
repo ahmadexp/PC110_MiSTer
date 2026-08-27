@@ -19,7 +19,6 @@ set_global_assignment -name VERILOG_MACRO "MISTER_FB=1"
 set_global_assignment -name VERILOG_MACRO "MISTER_FB_PALETTE=1"
 set_global_assignment -name VERILOG_MACRO "DE25_VIDEO_SCALER=1"
 set_global_assignment -name VERILOG_MACRO "DE25_PLL_DIAGNOSTIC=1"
-set_global_assignment -name VERILOG_MACRO "DE25_SI5332_ADDRESS_PROBE=1"
 
 set_global_assignment -name SEARCH_PATH ../rtl
 set_global_assignment -name SEARCH_PATH ../..
