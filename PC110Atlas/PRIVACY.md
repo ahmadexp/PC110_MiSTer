@@ -1,8 +1,8 @@
 # PC 110 Privacy Policy
 
-Effective date: September 6, 2026
+Effective date: October 3, 2026
 
-PC 110 does not collect, transmit, sell, or share personal data. It does not contain advertising SDKs, analytics SDKs, tracking technology, user accounts, or in-app purchases.
+PC 110 does not collect personal data for the developer, sell personal data, or send imported files to an application server. Optional paired-watch features exchange live display, audio, and input as described below. The app does not contain advertising SDKs, analytics SDKs, tracking technology, user accounts, or in-app purchases.
 
 ## Files You Import
 
@@ -16,9 +16,17 @@ Emulation and guest audio run locally on Vision Pro. The app's spatial windows s
 
 When you use the Apple Watch companion, the paired iPhone and Apple Watch exchange emulator status, compressed display previews, downsampled guest audio, and remote-input commands through Apple's WatchConnectivity service. These paired-device messages may reflect content visible or audible inside the guest operating system, but PC 110 does not send them to the developer or to an application server. Audio packets are played transiently and are not saved on the Watch. Firmware and disk-image files remain on the iPhone and are not copied to the Watch.
 
+## Wear OS Companion
+
+In the Google Play Android edition, watch sharing is off by default. When you enable the watch link on the phone and connect PC110 Live on a nearby paired Wear OS watch, the devices exchange compressed emulator display previews, connection status, and remote pointer and key commands through Google's Wearable Data Layer. Guest audio is sent only when enabled on the watch. Display and audio can include personal content shown or played inside the guest operating system. They are processed transiently and are not saved on the watch or sent to the developer or an application server. Firmware and disk-image files remain on the phone. Sharing stops when you disable the link, leave the phone's Run view, or background the app. The companion does not record the microphone. The Amazon edition does not include this feature.
+
+## Android XR Preview
+
+The optional Android XR 3D laptop reuses the emulator session and guest audio on the same headset. It does not stream imported media to another device or request camera, microphone, hand-tracking, eye-tracking, or room-mapping permissions. Standard spatial input is handled by the operating system's interface framework.
+
 ## Network Access and External Links
 
-The app does not make an automatic internet request when it launches or while you browse its built-in content. Paired-device WatchConnectivity traffic is described above. If you choose a link to a source repository, legal notice, privacy policy, or other external resource, the operating system opens that destination. The destination's operator may process data under its own privacy policy.
+The app does not make an automatic internet request when it launches or while you browse its built-in content. Optional paired-device WatchConnectivity and Wearable Data Layer traffic is described above and uses the platform provider's transport. If you choose a link to a source repository, legal notice, privacy policy, or other external resource, the operating system opens that destination. The destination's operator may process data under its own privacy policy.
 
 ## Data Retention and Deletion
 
