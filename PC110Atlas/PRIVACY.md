@@ -20,6 +20,8 @@ When you use the Apple Watch companion, the paired iPhone and Apple Watch exchan
 
 In the Google Play Android edition, watch sharing is off by default. When you enable the watch link on the phone and connect PC110 Live on a nearby paired Wear OS watch, the devices exchange compressed emulator display previews, connection status, and remote pointer and key commands through Google's Wearable Data Layer. Guest audio is sent only when enabled on the watch. Display and audio can include personal content shown or played inside the guest operating system. They are processed transiently and are not saved on the watch or sent to the developer or an application server. Firmware and disk-image files remain on the phone. Sharing stops when you disable the link, leave the phone's Run view, or background the app. The companion does not record the microphone. The Amazon edition does not include this feature.
 
+Google Play services chooses the transport. Its Data Layer uses encrypted Bluetooth or an end-to-end encrypted relay through Google-owned servers. Only the matching signed phone and watch apps can access the exchanged content. PC 110 does not operate that relay or receive its contents.
+
 ## Android XR Preview
 
 The optional Android XR 3D laptop reuses the emulator session and guest audio on the same headset. It does not stream imported media to another device or request camera, microphone, hand-tracking, eye-tracking, or room-mapping permissions. Standard spatial input is handled by the operating system's interface framework.
