@@ -18,17 +18,23 @@ August 9, 2026: [MiSTer-devel/Main_MiSTer#1272](https://github.com/MiSTer-devel/
 The coordinated independent-identity core change is also merged and has passed
 the complete regression on two MiSTer systems.
 
-The currently published stable MiSTer Main binary predates that merge and does
-not recognize the new `PC110` identity. If you are interested in using this
-core, please wait for the next official MiSTer Main release before installing
-the public `v2026.08.08` package. The PC110 core is not yet included in the
-official MiSTer update database.
+The official distribution Main binary checked on November 19, 2026 reports
+`$VER:261010` and includes PC110 recognition. Update Main before installing
+the `v2026.08.08` core. The core is being proposed for MiSTer-devel review;
+it is not yet included in the official distribution or update database.
+See the [submission record](docs/SUBMISSION.md) for the candidate, validation
+and proposed downloader metadata.
 
 ## MiSTer-ready download
 
-The [latest GitHub release](https://github.com/ahmadexp/PC110_MiSTer/releases/latest)
-includes `IBM-PC110-MiSTer-Ready-20260808.zip`, a backup-first package laid out
-for a standard MiSTer SD card. It contains the verified core, PersonaWare
+The [FPGA core release v2026.08.08](https://github.com/ahmadexp/PC110_MiSTer/releases/tag/v2026.08.08)
+provides the core-only `PC110_20260808.rbf` for manual installation and
+MiSTer-devel review. BIOS, font ROM and disk images are not part of that
+bitstream or the proposed official distribution.
+
+The same release also has a separate convenience download,
+`IBM-PC110-MiSTer-Ready-20260808.zip`, a backup-first package laid out for a
+standard MiSTer SD card. It contains the verified core, PersonaWare
 English 2.0.6 VHD, matching 2/32/128 CHS metadata, installer, ROM preparation
 tool, checksums, licenses, and notices.
 
@@ -161,15 +167,16 @@ values onto an arbitrary image. A copyable, image-specific example is in
 Main provides the required shared x86 transport. The small compatibility patch
 in `scripts/main-patches` recognizes `PC110` as an x86 variant, following the
 existing PCXT variant pattern. It adds no machine profile and does not override
-image geometry. The change is under review as
-[Main_MiSTer#1272](https://github.com/MiSTer-devel/Main_MiSTer/pull/1272).
+image geometry. The change was merged on August 9, 2026 as
+[Main_MiSTer#1272](https://github.com/MiSTer-devel/Main_MiSTer/pull/1272)
+and is present in the official Main release checked above.
 
 The generic ATA diagnostic/read-verify improvements were merged separately as
 [Main_MiSTer#1252](https://github.com/MiSTer-devel/Main_MiSTer/pull/1252).
 
-    scripts/apply-main-patches.sh /path/to/Main_MiSTer
-
-then build Main the usual way in the arm toolchain container.
+Use the current official Main release. The historical patches under
+`scripts/main-patches` are retained as a reference for older source trees;
+they are not required when using a current upstream Main.
 
 ## Notes
 

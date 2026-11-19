@@ -63,9 +63,11 @@ geometry through a same-basename `.cfg`; the tested 4 MiB PersonaWare image's
 MBR and BPB already use 2 heads, 32 sectors per track and 128 cylinders. The
 metadata declares rather than replaces those values.
 
-The Main recognition change is under review as `Main_MiSTer#1272`. A core with
-the `PC110` identity must not be installed with an older Main binary because
-the x86 transport will not initialize.
+The Main recognition change was merged on August 9, 2026 as
+`Main_MiSTer#1272`. The official distribution Main checked on November 19,
+2026 reports `$VER:261010` and includes PC110 recognition. A core with the
+`PC110` identity must not be installed with a Main binary predating this
+support because the x86 transport will not initialize.
 
 A December 2024 upstream prefetch-reset correction (`be9b103`) is retained in
 `rtl/ao486/memory/prefetch.v`.
