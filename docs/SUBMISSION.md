@@ -8,7 +8,10 @@ firmware.
 
 The requested outcome is acceptance of the PC110 FPGA core into MiSTer-devel,
 followed by inclusion in the official distribution and its generated downloader
-database. This record does not indicate maintainer acceptance.
+database. The request was sent to `newcores@misterfpga.org` on November 19,
+2026 with the subject "PC110 core submission for MiSTer-devel and official
+updater inclusion". Gmail confirmed that the message was sent. Status:
+awaiting maintainer review. This record does not indicate acceptance.
 
 - Source: [PC110_MiSTer](https://github.com/ahmadexp/PC110_MiSTer)
 - Candidate tag: [v2026.08.08](https://github.com/ahmadexp/PC110_MiSTer/releases/tag/v2026.08.08)

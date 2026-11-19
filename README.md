@@ -20,8 +20,9 @@ the complete regression on two MiSTer systems.
 
 The official distribution Main binary checked on November 19, 2026 reports
 `$VER:261010` and includes PC110 recognition. Update Main before installing
-the `v2026.08.08` core. The core is being proposed for MiSTer-devel review;
-it is not yet included in the official distribution or update database.
+the `v2026.08.08` core. The core was submitted to the MiSTer new-core team
+on November 19, 2026 for review and official distribution/updater inclusion.
+It is awaiting review and is not yet in the official update database.
 See the [submission record](docs/SUBMISSION.md) for the candidate, validation
 and proposed downloader metadata.
 
